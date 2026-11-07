@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Carbon\Carbon;
 
 /**
  * @property int $id
  * @property int $user_id
+ * @property int $voice_group_id
+ * @property int|null $voice_id
  * @property string|null $address
  * @property string|null $phone
  * @property Carbon|null $birth_date
@@ -25,6 +27,8 @@ class UserProfile extends Model
 
     protected $fillable = [
         'user_id',
+        'voice_group_id',
+        'voice_id',
         'address',
         'phone',
         'birth_date',
@@ -35,11 +39,21 @@ class UserProfile extends Model
 
     protected function casts(): array
     {
-        return ['birth_date' => 'date'];
+        return ['birth_date' => 'date',];
     }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function voiceGroup(): BelongsTo
+    {
+        return $this->belongsTo(VoiceGroup::class);
+    }
+
+    public function voice(): BelongsTo
+    {
+        return $this->belongsTo(Voice::class);
     }
 }

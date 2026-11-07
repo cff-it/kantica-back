@@ -2,34 +2,37 @@
 
 namespace App\Models;
 
+use App\Enums\UserStatus;
+use App\Notifications\VerifyEmailNotification;
+use Carbon\Carbon;
 use Database\Factories\UserFactory;
+use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
-use Carbon\Carbon;
 
 /**
  * @property int $id
  * @property string $mail
  * @property int|null $facebook_id
- * @property string $last_name
+ * @property string|null $last_name
  * @property string|null $nick_name
  * @property string|null $token
- * @property int|null $voice_id
  * @property string $password
+ * @property UserStatus $status
  * @property Carbon|null $email_verified_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
  */
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, HasRoles, Notifiable;
+    use HasApiTokens, HasFactory, HasRoles, MustVerifyEmailTrait, Notifiable;
 
     protected $fillable = [
         'mail',
@@ -37,8 +40,8 @@ class User extends Authenticatable
         'nick_name',
         'facebook_id',
         'token',
-        'voice_id',
         'password',
+        'status',
     ];
 
     protected $hidden = [
@@ -51,6 +54,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password'          => 'hashed',
+            'status'            => UserStatus::class,
         ];
     }
 
@@ -60,9 +64,21 @@ class User extends Authenticatable
         return $this->mail;
     }
 
-    public function voice(): BelongsTo
+    // Les notifications mail utilisent `mail` au lieu de `email`
+    public function routeNotificationForMail(): string
     {
-        return $this->belongsTo(Voice::class);
+        return $this->mail;
+    }
+
+    // La vérification d'email utilise `mail` au lieu de `email`
+    public function getEmailForVerification(): string
+    {
+        return $this->mail;
+    }
+
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new VerifyEmailNotification());
     }
 
     public function firstnames(): HasMany

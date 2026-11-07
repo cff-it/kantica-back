@@ -13,7 +13,7 @@ readonly class LoginAction
     {
         $user = User::where('mail', $dto->mail)->first();
 
-        if (! $user || ! Hash::check($dto->password, $user->password)) {
+        if (!$user || !Hash::check($dto->password, $user->password)) {
             throw new AuthenticationException('Identifiants invalides.');
         }
 

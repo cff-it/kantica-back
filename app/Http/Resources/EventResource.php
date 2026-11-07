@@ -16,12 +16,13 @@ class EventResource extends JsonResource
             'date_end'       => $this->date_end?->toIso8601String(),
             'need_payment'   => $this->need_payment,
             'payment_amount' => $this->payment_amount,
-            'subscriptions'  => $this->whenLoaded('subscriptions', fn () =>
-                $this->subscriptions->map(fn ($s) => [
+            'subscriptions'  => $this->whenLoaded(
+                'subscriptions',
+                fn () => $this->subscriptions->map(fn ($s) => [
                     'user_id'       => $s->user_id,
                     'subscribed_at' => $s->subscribed_at->toIso8601String(),
                     'has_paid'      => $s->has_paid,
-                ])
+                ]),
             ),
             'created_at'     => $this->created_at->toIso8601String(),
         ];

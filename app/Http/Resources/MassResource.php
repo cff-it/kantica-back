@@ -17,12 +17,13 @@ class MassResource extends JsonResource
             'notes'           => $this->notes,
             'is_public'       => $this->is_public,
             'parts'           => MassPartResource::collection($this->whenLoaded('parts')),
-            'role_assignments' => $this->whenLoaded('roleAssignments', fn () =>
-                $this->roleAssignments->map(fn ($a) => [
+            'role_assignments' => $this->whenLoaded(
+                'roleAssignments',
+                fn () => $this->roleAssignments->map(fn ($a) => [
                     'user'  => $a->user?->last_name,
                     'role'  => $a->massRole?->name,
                     'notes' => $a->notes,
-                ])
+                ]),
             ),
             'created_at'      => $this->created_at->toIso8601String(),
         ];

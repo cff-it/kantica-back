@@ -2,7 +2,6 @@
 
 namespace App\Actions\Mass;
 
-use App\Models\Mass;
 use App\Repositories\MassRepository;
 
 readonly class GeneratePptxAction

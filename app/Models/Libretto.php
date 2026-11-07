@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Carbon\Carbon;
 
 /**
  * @property int $id
@@ -26,7 +26,7 @@ class Libretto extends Model
     public function songs(): BelongsToMany
     {
         return $this->belongsToMany(Song::class, 'song_libretti')
-                    ->withPivot('position')
-                    ->orderByPivot('position');
+            ->withPivot('position')
+            ->orderByPivot('position');
     }
 }

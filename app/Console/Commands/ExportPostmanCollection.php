@@ -18,6 +18,9 @@ class ExportPostmanCollection extends Command
 
     protected $description = 'Génère une collection Postman depuis les routes Laravel';
 
+    // Identifiant fixe : au réimport, Postman reconnaît la collection et propose de la remplacer au lieu de la dupliquer
+    private const string COLLECTION_ID = '8b779442-5b42-4dc5-88e9-826867b5286c';
+
     public function handle(): int
     {
         $collectionName = $this->option('name') ?? config('app.name', 'Laravel');
@@ -47,6 +50,7 @@ class ExportPostmanCollection extends Command
     {
         return [
             'info' => [
+                '_postman_id' => self::COLLECTION_ID,
                 'name' => $name,
                 'schema' => 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
             ],

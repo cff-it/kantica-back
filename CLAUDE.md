@@ -4,6 +4,18 @@
 
 ---
 
+## Workflow (vibe-coding)
+
+- **Pas de plan d'implémentation** : implémenter directement la demande, sans rédiger de plan au préalable
+  ni attendre de validation.
+- **Plan de tests après implémentation** : une fois le code écrit, rédiger un plan de tests dans le dossier
+  de la session (`session-tracking/<story>/<sous-ticket>/`), contenant :
+  - les scénarios à tester (cas nominaux, cas d'erreur, cas limites) ;
+  - pour chaque scénario : prérequis, étapes (requête HTTP, payload), résultat attendu (code HTTP, réponse, état en BDD) ;
+  - les tests automatisés écrits ou à écrire (Feature / Unit).
+
+---
+
 ## Stack technique
 
 - **Framework** : Laravel
@@ -183,6 +195,51 @@ public function toDTO(): CheckInDTO
 - **Repositories** : nom + Repository → `SongRepository`, `EventRepository`
 - **Policies** : nom + Policy → `SongPolicy`, `EventPolicy`
 - **Resources** : nom + Resource → `SongResource`, `UserResource`
+
+---
+
+## Style de code (Laravel Pint)
+
+Le style est vérifié en CI par `vendor/bin/pint --test` (job `lint` de `.github/workflows/ci.yml`).
+La configuration est dans `pint.json` : preset `laravel` + les ajustements ci-dessous.
+
+- **Avant chaque commit** : lancer `vendor/bin/pint` (corrige) ou `vendor/bin/pint --test` (vérifie seulement).
+- Ne pas modifier `pint.json` pour faire passer un fichier : corriger le code.
+
+### Règles propres au projet (écarts au preset Laravel)
+
+| Règle | Convention | Exemple |
+|---|---|---|
+| Alignement `=>` et `=` | Libre : l'alignement manuel est conservé, Pint n'y touche pas | `'title'  => $dto->title,` |
+| Virgule finale sur une ligne | Autorisée (et recommandée) | `[1, 2, 3,]` |
+| Espace après la virgule finale | Aucun | `['--force' => true,]` |
+| Opérateur `!` | Pas d'espace après | `if (!$user)` |
+| Instanciation | Toujours avec parenthèses | `new MailMessage()` |
+| Concaténation `.` | Sans espaces | `$a.$b` |
+
+### Règles du preset Laravel appliquées (à respecter)
+
+- Imports triés par ordre alphabétique, aucun import inutilisé.
+- Pas de nom de classe complet dans le code (`\Foo\Bar::class`) : ajouter un `use`.
+- Appels chaînés sur plusieurs lignes : indentés de 4 espaces par rapport à la ligne de départ.
+
+```php
+return $this->belongsToMany(Libretto::class, 'song_libretti')
+    ->withPivot('position')
+    ->orderByPivot('position');
+```
+
+- Closure multi-lignes passée en argument : un argument par ligne.
+
+```php
+'subscriptions' => $this->whenLoaded(
+    'subscriptions',
+    fn () => $this->subscriptions->map(fn ($s) => [
+        'user_id'  => $s->user_id,
+        'has_paid' => $s->has_paid,
+    ]),
+),
+```
 
 ---
 

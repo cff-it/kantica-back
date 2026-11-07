@@ -1,0 +1,29 @@
+meta {
+  name: logout
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/auth/logout
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Révoque le token courant. Accessible aux comptes en attente.
+}
+
+tests {
+  test("déconnecté", function () {
+    expect(res.status).to.equal(204);
+  });
+}

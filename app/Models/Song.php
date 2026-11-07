@@ -33,8 +33,8 @@ class Song extends Model
     public function libretti(): BelongsToMany
     {
         return $this->belongsToMany(Libretto::class, 'song_libretti')
-                    ->withPivot('position')
-                    ->orderByPivot('position');
+            ->withPivot('position')
+            ->orderByPivot('position');
     }
 
     public function sections(): HasMany
