@@ -34,15 +34,15 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'   # keep in sync with composer.json
+          php-version: '8.4'   # keep in sync with composer.json
           coverage: none
 
       - name: Cache Composer dependencies
         uses: actions/cache@v4
         with:
           path: vendor
-          key: ${{ runner.os }}-php8.3-composer-${{ hashFiles('composer.lock') }}
-          restore-keys: ${{ runner.os }}-php8.3-composer-
+          key: ${{ runner.os }}-php8.4-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-php8.4-composer-
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
@@ -90,7 +90,7 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'   # keep in sync with composer.json
+          php-version: '8.4'   # keep in sync with composer.json
           extensions: pdo_pgsql, pgsql, mbstring, zip, gd
           coverage: none
 
@@ -98,8 +98,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: vendor
-          key: ${{ runner.os }}-php8.3-composer-${{ hashFiles('composer.lock') }}
-          restore-keys: ${{ runner.os }}-php8.3-composer-
+          key: ${{ runner.os }}-php8.4-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-php8.4-composer-
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
