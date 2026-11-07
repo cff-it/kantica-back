@@ -18,12 +18,13 @@ class MassPartResource extends JsonResource
             ]),
             'antiphon' => $this->antiphon,
             'prayer'   => $this->whenLoaded('prayer', fn () => $this->prayer?->title),
-            'songs'    => $this->whenLoaded('massSongs', fn () =>
-                $this->massSongs->map(fn ($ms) => [
+            'songs'    => $this->whenLoaded(
+                'massSongs',
+                fn () => $this->massSongs->map(fn ($ms) => [
                     'id'             => $ms->id,
                     'song'           => SongResource::make($ms->song),
                     'specific_title' => $ms->specific_title,
-                ])
+                ]),
             ),
         ];
     }

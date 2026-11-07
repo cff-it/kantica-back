@@ -28,7 +28,7 @@ class MemberProfileRepository
     }
 
     /**
-     * @param array{voice_group_id: int, voice_id: int|null, phone: string} $attributes
+     * @param  array{voice_group_id: int, voice_id: int|null, phone: string}  $attributes
      */
     public function upsertProfile(User $user, array $attributes): void
     {
