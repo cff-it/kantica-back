@@ -114,3 +114,57 @@ jobs:
 
       - name: Run tests
         run: php artisan test
+
+  # ---------------------------------------------------------------
+  # Job 3: automatic code review by Claude (pull requests only)
+  # Requires the repository secret ANTHROPIC_API_KEY.
+  # ---------------------------------------------------------------
+  claude-review:
+    name: Claude review
+    runs-on: ubuntu-latest
+    # Skip pushes, draft PRs and PRs from forks (secrets are not available there)
+    if: >-
+      github.event_name == 'pull_request'
+      && !github.event.pull_request.draft
+      && github.event.pull_request.head.repo.full_name == github.repository
+
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Review pull request
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          use_sticky_comment: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request. Write all comments in French.
+            The PR branch is already checked out in the current working directory.
+            Read CLAUDE.md first: it defines the architecture (Action Pattern,
+            readonly Actions with __invoke(), Repositories, DTOs, thin Controllers)
+            and the code style rules (Laravel Pint, pint.json).
+
+            Focus on:
+            - bugs and edge cases;
+            - security (authorization, validation, mass assignment, SQL);
+            - violations of the CLAUDE.md architecture rules;
+            - performance (N+1 queries, missing eager loading);
+            - missing or weak tests.
+            Do not comment on formatting already enforced by Pint.
+
+            Post each finding on the relevant line with
+            `mcp__github_inline_comment__create_inline_comment` (with `confirmed: true`).
+            Post a single short summary with `gh pr comment`.
+            Only post GitHub comments, do not reply with plain messages.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"
