@@ -27,8 +27,8 @@ class Voice extends Model
         return $this->belongsTo(VoiceGroup::class, 'vocal_group_id');
     }
 
-    public function users(): HasMany
+    public function profiles(): HasMany
     {
-        return $this->hasMany(User::class);
+        return $this->hasMany(UserProfile::class);
     }
 }

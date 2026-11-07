@@ -10,6 +10,7 @@ use Carbon\Carbon;
 /**
  * @property int $id
  * @property string $name
+ * @property string $abbreviation
  * @property Carbon $created_at
  * @property Carbon $updated_at
  */
@@ -17,7 +18,7 @@ class VoiceGroup extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name'];
+    protected $fillable = ['name', 'abbreviation',];
 
     public function voices(): HasMany
     {

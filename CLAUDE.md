@@ -4,6 +4,18 @@
 
 ---
 
+## Workflow (vibe-coding)
+
+- **Pas de plan d'implémentation** : implémenter directement la demande, sans rédiger de plan au préalable
+  ni attendre de validation.
+- **Plan de tests après implémentation** : une fois le code écrit, rédiger un plan de tests dans le dossier
+  de la session (`session-tracking/<story>/<sous-ticket>/`), contenant :
+  - les scénarios à tester (cas nominaux, cas d'erreur, cas limites) ;
+  - pour chaque scénario : prérequis, étapes (requête HTTP, payload), résultat attendu (code HTTP, réponse, état en BDD) ;
+  - les tests automatisés écrits ou à écrire (Feature / Unit).
+
+---
+
 ## Stack technique
 
 - **Framework** : Laravel

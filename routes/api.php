@@ -1,8 +1,11 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\MassController;
+use App\Http\Controllers\MemberController;
+use App\Http\Controllers\MemberProfileController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SongController;
 use App\Http\Controllers\UserController;
@@ -19,11 +22,31 @@ Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
 
-    // ── Auth ────────────────────────────────────────────────────────────
+// Lien signé envoyé par email : ouvert sans token
+Route::get('/email/verify/{user}/{hash}', [EmailVerificationController::class, 'verify'])
+    ->middleware(['signed', 'throttle:6,1',])
+    ->name('verification.verify');
+
+// ── Routes accessibles aux comptes en attente de validation ────────────
+Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::post('/email/verification-notification', [EmailVerificationController::class, 'resend'])
+        ->middleware('throttle:6,1');
+
+    // Fiche de recensement de l'utilisateur courant (aucun identifiant dans l'URL)
+    Route::get('/me/profile', [MemberProfileController::class, 'show']);
+    Route::put('/me/profile', [MemberProfileController::class, 'update']);
+});
+
+// ── Routes réservées aux comptes validés ───────────────────────────────
+Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
+
+    // ── Validation des membres ──────────────────────────────────────────
+    Route::post('/members/{member}/validate', [MemberController::class, 'validateAccount'])
+        ->can('validate', 'member');
 
     // ── Répertoire chants ───────────────────────────────────────────────
     Route::prefix('songs')->group(function () {
