@@ -4,9 +4,12 @@ namespace App\Actions\Member;
 
 use App\DTOs\Member\MemberProfileDTO;
 use App\Models\User;
+use App\Models\Voice;
+use App\Models\VoiceGroup;
 use App\Repositories\MemberProfileRepository;
 use App\Repositories\VoiceRepository;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 readonly class UpdateOwnProfileAction
 {
@@ -18,19 +21,41 @@ readonly class UpdateOwnProfileAction
     // Crée la fiche si elle n'existe pas, sinon la met à jour (upsert sur l'utilisateur courant)
     public function __invoke(User $user, MemberProfileDTO $dto): User
     {
-        $voiceGroup = $this->voices->findGroupByAbbreviation($dto->voiceGroup);
-        $voice = $dto->voice !== null ? $this->voices->findVoiceInGroup($voiceGroup, $dto->voice) : null;
+        $attributes = ['phone' => $dto->phone,];
 
-        DB::transaction(function () use ($user, $dto, $voiceGroup, $voice): void {
+        if ($dto->voiceGroup !== null) {
+            $voiceGroup = $this->voices->findGroupByAbbreviation($dto->voiceGroup);
+            $voice = $dto->voice !== null ? $this->voices->findVoiceInGroup($voiceGroup, $dto->voice) : null;
+
+            // Voix modifiable : on l'enregistre. Sinon elle doit être identique à celle de la fiche (voir UserPolicy)
+            if ($user->can('updateOwnVoice', User::class)) {
+                $attributes['voice_group_id'] = $voiceGroup->id;
+                $attributes['voice_id'] = $voice?->id;
+            } else {
+                $this->ensureVoiceIsUnchanged($user, $voiceGroup, $voice);
+            }
+        }
+
+        DB::transaction(function () use ($user, $dto, $attributes): void {
             $this->profiles->updateLastName($user, $dto->lastName);
             $this->profiles->upsertDefaultFirstname($user, $dto->firstName);
-            $this->profiles->upsertProfile($user, [
-                'voice_group_id' => $voiceGroup->id,
-                'voice_id'       => $voice?->id,
-                'phone'          => $dto->phone,
-            ]);
+            $this->profiles->upsertProfile($user, $attributes);
         });
 
         return $this->profiles->load($user);
+    }
+
+    // Renvoyer la voix déjà enregistrée reste permis (le formulaire est pré-rempli avec la fiche)
+    private function ensureVoiceIsUnchanged(User $user, VoiceGroup $voiceGroup, ?Voice $voice): void
+    {
+        $profile = $user->profile;
+
+        if ($profile->voice_group_id === $voiceGroup->id && $profile->voice_id === $voice?->id) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'voice_group' => 'Votre voix ne peut être modifiée que par un administrateur.',
+        ]);
     }
 }

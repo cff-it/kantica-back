@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Member;
 
 use App\DTOs\Member\MemberProfileDTO;
+use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -15,10 +16,13 @@ class UpdateOwnProfileRequest extends FormRequest
 
     public function rules(): array
     {
+        // Groupe de voix obligatoire uniquement si le membre peut encore le modifier (voir UserPolicy)
+        $voiceGroupRequirement = $this->user()->can('updateOwnVoice', User::class) ? 'required' : 'nullable';
+
         return [
             'last_name'   => ['required', 'string', 'max:100',],
             'first_name'  => ['required', 'string', 'max:100',],
-            'voice_group' => ['required', 'string', Rule::exists('voice_groups', 'abbreviation'),],
+            'voice_group' => [$voiceGroupRequirement, 'string', Rule::exists('voice_groups', 'abbreviation'),],
             // Voix précise facultative (S1, S2, ...), qui doit appartenir au groupe choisi
             'voice'       => [
                 'nullable',

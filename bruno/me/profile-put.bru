@@ -31,6 +31,11 @@ body:json {
 docs {
   Crée la fiche si elle n'existe pas, sinon la met à jour. `voice_group` : S, A, T ou B (obligatoire). `voice` : S1, S2, A1... (facultatif, doit appartenir au groupe).
   L'email de contact n'est pas envoyé : la réponse renvoie l'email du compte (`users.mail`).
+
+  Même requête pour la modification de la fiche (compte en attente ou validé).
+  Une fois le compte validé, la voix (`voice_group` et `voice`) n'est plus modifiable par le membre : seul un admin peut la changer.
+  Elle devient alors facultative : omise, elle reste telle quelle ; renvoyée à l'identique (fiche pré-remplie avec `GET /me/profile`), elle est acceptée ; toute autre valeur renvoie 422 avec une erreur sur `voice_group`.
+  `voice_group` reste obligatoire pour un compte en attente, pour un admin et pour un compte validé qui n'a pas encore de fiche.
 }
 
 tests {
