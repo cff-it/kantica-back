@@ -38,11 +38,22 @@ readonly class UpdateOwnProfileAction
 
         DB::transaction(function () use ($user, $dto, $attributes): void {
             $this->profiles->updateLastName($user, $dto->lastName);
-            $this->profiles->upsertDefaultFirstname($user, $dto->firstName);
+            $this->profiles->replaceFirstnames($user, $this->splitFirstName($dto->firstName));
             $this->profiles->upsertProfile($user, $attributes);
         });
 
         return $this->profiles->load($user);
+    }
+
+    /**
+     * Chaque mot du prénom saisi est un prénom à part entière ("Hanta Rasoa" donne deux lignes).
+     * Les espaces en trop ne créent pas de prénom vide.
+     *
+     * @return list<string>
+     */
+    private function splitFirstName(string $firstName): array
+    {
+        return array_values(array_filter(explode(' ', $firstName), fn (string $word) => $word !== ''));
     }
 
     // Renvoyer la voix déjà enregistrée reste permis (le formulaire est pré-rempli avec la fiche)
