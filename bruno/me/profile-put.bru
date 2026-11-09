@@ -1,0 +1,49 @@
+meta {
+  name: profile-put
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/me/profile
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Accept: application/json
+}
+
+body:json {
+  {
+    "last_name": "Rasoanaivo",
+    "first_name": "Hanta",
+    "voice_group": "A",
+    "voice": "A2",
+    "phone": "034 12 345 67"
+  }
+}
+
+docs {
+  Crée la fiche si elle n'existe pas, sinon la met à jour. `voice_group` : S, A, T ou B (obligatoire). `voice` : S1, S2, A1... (facultatif, doit appartenir au groupe).
+  L'email de contact n'est pas envoyé : la réponse renvoie l'email du compte (`users.mail`).
+  `first_name` est découpé sur les espaces : chaque mot est une ligne de `firstnames` (ordre de saisie, le premier mot est le prénom par défaut). Les prénoms existants sont remplacés. La réponse et `GET /me/profile` renvoient les mots rejoints par un espace.
+
+  Même requête pour la modification de la fiche (compte en attente ou validé).
+  Une fois le compte validé, la voix (`voice_group` et `voice`) n'est plus modifiable par le membre : seul un admin peut la changer.
+  Elle devient alors facultative : omise, elle reste telle quelle ; renvoyée à l'identique (fiche pré-remplie avec `GET /me/profile`), elle est acceptée ; toute autre valeur renvoie 422 avec une erreur sur `voice_group`.
+  `voice_group` reste obligatoire pour un compte en attente, pour un admin et pour un compte validé qui n'a pas encore de fiche.
+}
+
+tests {
+  test("fiche enregistrée", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data.completed).to.equal(true);
+    expect(res.body.data.voice_group).to.equal("A");
+    expect(res.body.data.voice).to.equal("A2");
+  });
+}

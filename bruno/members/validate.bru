@@ -1,0 +1,32 @@
+meta {
+  name: validate
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/members/{{memberId}}/validate
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{secretaryToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Lancer d'abord `login-secretary` (token `secretaryToken`) et `auth/register` (`memberId`).
+  Le token doit appartenir à un compte actif et vérifié ayant le rôle `secretaire` ou `admin`.
+  Valider un compte déjà actif est sans effet (idempotent).
+}
+
+tests {
+  test("compte validé", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data.status).to.equal("active");
+  });
+}

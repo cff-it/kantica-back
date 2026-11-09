@@ -13,8 +13,11 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('email')->unique();
+            $table->string('mail')->unique();
+            $table->string('last_name', 100);
+            $table->string('nick_name', 100)->nullable();
+            $table->smallInteger('facebook_id')->nullable();
+            $table->string('token', 100)->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
@@ -22,7 +25,7 @@ return new class extends Migration
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
-            $table->string('email')->primary();
+            $table->string('mail')->primary();
             $table->string('token');
             $table->timestamp('created_at')->nullable();
         });
