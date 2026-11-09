@@ -18,13 +18,24 @@ class MemberProfileRepository
         $user->update(['last_name' => $lastName,]);
     }
 
-    // Le prénom saisi sur la fiche est le prénom par défaut (les autres prénoms restent intacts)
-    public function upsertDefaultFirstname(User $user, string $firstName): void
+    /**
+     * Remplace tous les prénoms de l'utilisateur : un mot = une ligne, dans l'ordre de saisie.
+     * Le premier mot est le prénom par défaut.
+     *
+     * @param  list<string>  $firstNames
+     */
+    public function replaceFirstnames(User $user, array $firstNames): void
     {
-        Firstname::updateOrCreate(
-            ['user_id' => $user->id, 'default' => true,],
-            ['first_name' => $firstName, 'order' => 0,],
-        );
+        Firstname::where('user_id', $user->id)->delete();
+
+        foreach ($firstNames as $order => $firstName) {
+            Firstname::create([
+                'user_id'    => $user->id,
+                'first_name' => $firstName,
+                'order'      => $order,
+                'default'    => $order === 0,
+            ]);
+        }
     }
 
     /**

@@ -15,7 +15,8 @@ class MemberProfileResource extends JsonResource
     {
         return [
             'last_name'    => $this->last_name,
-            'first_name'   => $this->firstnames->firstWhere('default', true)?->first_name,
+            // Les prénoms (un mot par ligne, déjà triés par `order`) sont rejoints pour pré-remplir le formulaire
+            'first_name'   => $this->firstnames->isEmpty() ? null : $this->firstnames->pluck('first_name')->implode(' '),
             'voice_group'  => $this->profile?->voiceGroup?->abbreviation,
             'voice'        => $this->profile?->voice?->name,
             'phone'        => $this->profile?->phone,

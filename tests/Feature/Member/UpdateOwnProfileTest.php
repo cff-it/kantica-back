@@ -129,6 +129,62 @@ class UpdateOwnProfileTest extends TestCase
         $this->assertSame(1, Firstname::where('user_id', $user->id)->count());
     }
 
+    /**
+     * @return array<string, array{string, list<string>}>
+     */
+    public static function composedFirstNames(): array
+    {
+        return [
+            'single word'         => ['Hanta', ['Hanta',],],
+            'two words'           => ['Hanta Rasoa', ['Hanta', 'Rasoa',],],
+            'three words'         => ['Hanta Rasoa Mamy', ['Hanta', 'Rasoa', 'Mamy',],],
+            'extra inner spaces'  => ['Hanta   Rasoa', ['Hanta', 'Rasoa',],],
+            'hyphenated word'     => ['Jean-Pierre Marie', ['Jean-Pierre', 'Marie',],],
+        ];
+    }
+
+    /**
+     * @param  list<string>  $words
+     */
+    #[DataProvider('composedFirstNames')]
+    public function test_each_word_of_the_first_name_is_a_row_of_firstnames(string $firstName, array $words): void
+    {
+        $user = User::factory()->pending()->create();
+        Sanctum::actingAs($user);
+
+        $this->putJson('/api/me/profile', [...self::PAYLOAD, 'first_name' => $firstName,])
+            ->assertOk()
+            ->assertJsonPath('data.first_name', implode(' ', $words));
+
+        $rows = Firstname::where('user_id', $user->id)->orderBy('order')->get();
+
+        $this->assertSame($words, $rows->pluck('first_name')->all());
+        $this->assertSame(array_keys($words), $rows->pluck('order')->all());
+        $this->assertSame([$words[0],], $rows->where('default', true)->pluck('first_name')->values()->all());
+
+        // Le formulaire pré-rempli retrouve le prénom complet, et /me liste chaque prénom
+        $this->getJson('/api/me/profile')->assertJsonPath('data.first_name', implode(' ', $words));
+        $this->getJson('/api/me')->assertJsonCount(count($words), 'data.firstnames');
+    }
+
+    public function test_saving_replaces_all_the_previous_first_names(): void
+    {
+        $user = User::factory()->pending()->create();
+        Firstname::create(['user_id' => $user->id, 'first_name' => 'Ancien', 'order' => 0, 'default' => true,]);
+        Firstname::create(['user_id' => $user->id, 'first_name' => 'Autre', 'order' => 1, 'default' => false,]);
+        Sanctum::actingAs($user);
+
+        $this->putJson('/api/me/profile', [...self::PAYLOAD, 'first_name' => 'Hanta Rasoa Mamy',])->assertOk();
+        $this->putJson('/api/me/profile', [...self::PAYLOAD, 'first_name' => 'Hanta Rasoa',])
+            ->assertOk()
+            ->assertJsonPath('data.first_name', 'Hanta Rasoa');
+
+        $this->assertSame(
+            ['Hanta', 'Rasoa',],
+            Firstname::where('user_id', $user->id)->orderBy('order')->pluck('first_name')->all(),
+        );
+    }
+
     public function test_an_empty_profile_is_returned_before_the_first_submission(): void
     {
         Sanctum::actingAs(User::factory()->pending()->create(['mail' => self::MAIL, 'last_name' => null,]));
