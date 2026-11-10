@@ -1,0 +1,29 @@
+meta {
+  name: me
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/me
+  body: none
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("utilisateur renvoyé", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data).to.have.property("status");
+    expect(res.body.data).to.have.property("email_verified");
+    expect(res.body.data.profile).to.have.property("completed");
+  });
+}
+
+docs {
+  Utilisateur connecté : rôles, `status` (pending / active), `email_verified` et fiche (`profile`).
+  Sert au routage du front. Accessible aux comptes en attente.
+}

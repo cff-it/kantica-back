@@ -3,59 +3,58 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: cff-back-app
+    container_name: kantica-back-app
     restart: unless-stopped
     working_dir: /var/www
     volumes:
       - .:/var/www
       - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
     networks:
-      - cff-network
+      - kantica-network
     depends_on:
       - db
       - redis
 
   nginx:
     image: nginx:alpine
-    container_name: cff-back-nginx
+    container_name: kantica-back-nginx
     restart: unless-stopped
     ports:
-      - "8000:80"
+      - "8008:80"
     volumes:
       - .:/var/www
       - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf
     networks:
-      - cff-network
+      - kantica-network
     depends_on:
       - app
 
   db:
-    image: mysql:8.0
-    container_name: cff-back-db
+    image: postgres:17-alpine
+    container_name: kantica-back-db
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ${DB_DATABASE:-cff_back}
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-secret}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-secret}
-      MYSQL_USER: ${DB_USERNAME:-cff_user}
+      POSTGRES_DB: ${DB_DATABASE:-kantica}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      POSTGRES_USER: ${DB_USERNAME:-kantica_user}
     ports:
-      - "3306:3306"
+      - "6543:5432"
     volumes:
-      - db-data:/var/lib/mysql
+      - db-data:/var/lib/postgresql/data
     networks:
-      - cff-network
+      - kantica-network
 
   redis:
     image: redis:alpine
-    container_name: cff-back-redis
+    container_name: kantica-back-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
     networks:
-      - cff-network
+      - kantica-network
 
 networks:
-  cff-network:
+  kantica-network:
     driver: bridge
 
 volumes:

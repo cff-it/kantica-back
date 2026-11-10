@@ -1,0 +1,27 @@
+meta {
+  name: resend-verification
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/email/verification-notification
+  body: none
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("demande traitée", function () {
+    expect(res.status).to.equal(200);
+  });
+}
+
+docs {
+  Renvoie l'email de vérification. Sans effet si l'adresse est déjà vérifiée.
+  Le lien reçu (`GET /api/email/verify/{user}/{hash}?expires=...&signature=...`)
+  est visible dans `storage/logs/laravel.log` en local (`MAIL_MAILER=log`).
+}
