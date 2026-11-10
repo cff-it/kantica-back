@@ -1,0 +1,48 @@
+meta {
+  name: list
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/members?page=2
+  body: none
+  auth: inherit
+}
+
+params:query {
+  page: 2
+  ~search: elysee
+  ~voice: S
+  ~limit: 1
+  ~"meta[\"per_page\"]": 1
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("liste des membres", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data).to.be.an("array");
+    expect(res.body.meta.registered_count).to.be.a("number");
+    expect(res.body.meta.voice_counts).to.be.an("array");
+  });
+}
+
+docs {
+  Liste des membres recensés, triés par nom, 20 par page. Lancer d'abord `login-secretary` (token `secretaryToken`).
+  Le token doit appartenir à un compte actif et vérifié ayant le rôle `secretaire` ou `admin` (403 sinon).
+  
+  Paramètres (tous facultatifs, les deux filtres s'activent en cochant la ligne) :
+  - `search` : nom ou prénom, insensible à la casse et aux accents ; plusieurs mots = tous doivent correspondre
+  - `voice` : `S`, `A`, `T` ou `B`
+  - `page` : numéro de page, 1 par défaut
+  
+  Chaque ligne : `id`, `last_name`, `first_name`, `voice_group`, `voice`, `status` (`pending` = badge « En attente »).
+  Les comptes en attente sont listés.
+  
+  `meta.total` suit la recherche et le filtre. `meta.registered_count` (« 9 choristes recensés ») et
+  `meta.voice_counts` (« Soprano · 3 ») ne les suivent pas : ils portent sur tous les membres recensés.
+}
