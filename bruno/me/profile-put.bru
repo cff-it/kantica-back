@@ -7,11 +7,7 @@ meta {
 put {
   url: {{baseUrl}}/me/profile
   body: json
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{token}}
+  auth: inherit
 }
 
 headers {
@@ -20,17 +16,10 @@ headers {
 
 body:json {
   {
-    "last_name": "Rasoanaivo",
-    "first_name": "Hanta",
-    "voice_group": "A",
-    "voice": "A2",
-    "phone": "034 12 345 67"
+    "last_name": "Rasoamaka",
+    "first_name": "Testeur Un",
+    "phone": "034 13 345 69"
   }
-}
-
-docs {
-  Crée la fiche si elle n'existe pas, sinon la met à jour. `voice_group` : S, A, T ou B (obligatoire). `voice` : S1, S2, A1... (facultatif, doit appartenir au groupe).
-  L'email de contact n'est pas envoyé : la réponse renvoie l'email du compte (`users.mail`).
 }
 
 tests {
@@ -40,4 +29,13 @@ tests {
     expect(res.body.data.voice_group).to.equal("A");
     expect(res.body.data.voice).to.equal("A2");
   });
+}
+
+docs {
+  Crée la fiche si elle n'existe pas, sinon la met à jour. `voice_group` : S, A, T ou B (obligatoire). `voice` : S1, S2, A1... (facultatif, doit appartenir au groupe).
+  L'email de contact n'est pas envoyé : la réponse renvoie l'email du compte (`users.mail`).
+  
+  Même requête pour la modification de la fiche (compte en attente ou validé). Envoyer la fiche complète, pré-remplie avec `GET /me/profile`.
+  Une fois le compte validé, la voix (`voice_group` et `voice`) n'est plus modifiable par le membre : seul un admin peut la changer.
+  Renvoyer la voix déjà enregistrée reste accepté ; toute autre valeur renvoie 422 avec une erreur sur `voice_group`.
 }

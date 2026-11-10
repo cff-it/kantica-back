@@ -7,21 +7,11 @@ meta {
 get {
   url: {{baseUrl}}/me/profile
   body: none
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{token}}
+  auth: inherit
 }
 
 headers {
   Accept: application/json
-}
-
-docs {
-  Fiche de l'utilisateur courant. `completed = false` tant qu'elle n'a pas été enregistrée.
-  `contact_mail` est l'email du compte (lecture seule).
-  Accessible aux comptes en attente de validation.
 }
 
 tests {
@@ -31,4 +21,10 @@ tests {
       "last_name", "first_name", "voice_group", "voice", "phone", "contact_mail", "completed"
     );
   });
+}
+
+docs {
+  Fiche de l'utilisateur courant. `completed = false` tant qu'elle n'a pas été enregistrée.
+  `contact_mail` est l'email du compte (lecture seule).
+  Accessible aux comptes en attente de validation.
 }

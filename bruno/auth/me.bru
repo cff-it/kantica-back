@@ -7,20 +7,11 @@ meta {
 get {
   url: {{baseUrl}}/me
   body: none
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{token}}
+  auth: inherit
 }
 
 headers {
   Accept: application/json
-}
-
-docs {
-  Utilisateur connecté : rôles, `status` (pending / active), `email_verified` et fiche (`profile`).
-  Sert au routage du front. Accessible aux comptes en attente.
 }
 
 tests {
@@ -30,4 +21,9 @@ tests {
     expect(res.body.data).to.have.property("email_verified");
     expect(res.body.data.profile).to.have.property("completed");
   });
+}
+
+docs {
+  Utilisateur connecté : rôles, `status` (pending / active), `email_verified` et fiche (`profile`).
+  Sert au routage du front. Accessible aux comptes en attente.
 }

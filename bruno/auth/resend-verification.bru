@@ -7,25 +7,21 @@ meta {
 post {
   url: {{baseUrl}}/email/verification-notification
   body: none
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{token}}
+  auth: inherit
 }
 
 headers {
   Accept: application/json
 }
 
-docs {
-  Renvoie l'email de vérification. Sans effet si l'adresse est déjà vérifiée.
-  Le lien reçu (`GET /api/email/verify/{user}/{hash}?expires=...&signature=...`)
-  est visible dans `storage/logs/laravel.log` en local (`MAIL_MAILER=log`).
-}
-
 tests {
   test("demande traitée", function () {
     expect(res.status).to.equal(200);
   });
+}
+
+docs {
+  Renvoie l'email de vérification. Sans effet si l'adresse est déjà vérifiée.
+  Le lien reçu (`GET /api/email/verify/{user}/{hash}?expires=...&signature=...`)
+  est visible dans `storage/logs/laravel.log` en local (`MAIL_MAILER=log`).
 }

@@ -7,23 +7,19 @@ meta {
 post {
   url: {{baseUrl}}/auth/logout
   body: none
-  auth: bearer
-}
-
-auth:bearer {
-  token: {{token}}
+  auth: inherit
 }
 
 headers {
   Accept: application/json
 }
 
-docs {
-  Révoque le token courant. Accessible aux comptes en attente.
-}
-
 tests {
   test("déconnecté", function () {
     expect(res.status).to.equal(204);
   });
+}
+
+docs {
+  Révoque le token courant. Accessible aux comptes en attente.
 }
