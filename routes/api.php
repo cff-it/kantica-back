@@ -9,6 +9,7 @@ use App\Http\Controllers\MemberProfileController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SongController;
 use App\Http\Controllers\UserController;
+use App\Models\UserProfile;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -43,6 +44,17 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // ── Routes réservées aux comptes validés ───────────────────────────────
 Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
+
+    // ── Fiches de recensement des membres (Secrétaire et Admin) ─────────
+    // whereNumber : `/members/export` (KAN-30) ne doit jamais être pris pour un identifiant
+    Route::get('/members', [MemberController::class, 'index'])
+        ->can('viewAny', UserProfile::class);
+    Route::get('/members/{member}', [MemberController::class, 'show'])
+        ->whereNumber('member')
+        ->can('view', UserProfile::class);
+    Route::put('/members/{member}', [MemberController::class, 'update'])
+        ->whereNumber('member')
+        ->can('update', UserProfile::class);
 
     // ── Validation des membres ──────────────────────────────────────────
     Route::post('/members/{member}/validate', [MemberController::class, 'validateAccount'])
