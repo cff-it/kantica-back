@@ -7,7 +7,7 @@ meta {
 get {
   url: {{baseUrl}}/members/export?format=csv
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:query {
@@ -15,20 +15,8 @@ params:query {
   ~voice: S
 }
 
-auth:bearer {
-  token: {{secretaryToken}}
-}
-
 headers {
   Accept: application/json
-}
-
-docs {
-  Lancer d'abord `login-secretary` (token `secretaryToken`).
-  Le token doit appartenir à un compte actif et vérifié ayant le rôle `secretaire` ou `admin` (403 sinon).
-  Exporte les membres actifs, triés par nom. Le paramètre `voice` (S, A, T, B) est facultatif : le cocher
-  pour ne garder qu'une voix.
-  CSV en UTF-8 avec BOM, séparateur `;` (ouverture directe dans Excel). Nom du fichier : `membres-cff-AAAA-MM-JJ.csv`.
 }
 
 tests {
@@ -37,4 +25,12 @@ tests {
     expect(res.headers["content-type"]).to.contain("text/csv");
     expect(res.headers["content-disposition"]).to.contain("membres-cff-");
   });
+}
+
+docs {
+  Lancer d'abord `login-secretary` (token `secretaryToken`).
+  Le token doit appartenir à un compte actif et vérifié ayant le rôle `secretaire` ou `admin` (403 sinon).
+  Exporte les membres actifs, triés par nom. Le paramètre `voice` (S, A, T, B) est facultatif : le cocher
+  pour ne garder qu'une voix.
+  CSV en UTF-8 avec BOM, séparateur `;` (ouverture directe dans Excel). Nom du fichier : `membres-cff-AAAA-MM-JJ.csv`.
 }
