@@ -1,0 +1,40 @@
+meta {
+  name: login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Accept: application/json
+}
+
+body:json {
+  {
+    "mail": "{{memberMail}}",
+    "password": "{{memberPassword}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setVar("token", res.body.token);
+  }
+}
+
+docs {
+  Reconnecte le membre créé par `register` (même `memberMail` dans la session Bruno).
+  Pour un autre compte, remplacer le body.
+}
+
+tests {
+  test("token renvoyé", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.token).to.be.a("string");
+  });
+}
