@@ -1,0 +1,40 @@
+meta {
+  name: export-xlsx
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/members/export?format=xlsx
+  body: none
+  auth: bearer
+}
+
+params:query {
+  format: xlsx
+  ~voice: S
+}
+
+auth:bearer {
+  token: {{secretaryToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Lancer d'abord `login-secretary` (token `secretaryToken`).
+  Le token doit appartenir à un compte actif et vérifié ayant le rôle `secretaire` ou `admin` (403 sinon).
+  Exporte les membres actifs, triés par nom. Le paramètre `voice` (S, A, T, B) est facultatif : le cocher
+  pour ne garder qu'une voix.
+  Fichier Excel (.xlsx) : une feuille « Membres », en-têtes en gras. Nom du fichier : `membres-cff-AAAA-MM-JJ.xlsx`.
+}
+
+tests {
+  test("Excel téléchargé", function () {
+    expect(res.status).to.equal(200);
+    expect(res.headers["content-type"]).to.contain("spreadsheetml.sheet");
+    expect(res.headers["content-disposition"]).to.contain("membres-cff-");
+  });
+}

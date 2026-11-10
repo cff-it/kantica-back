@@ -1,0 +1,40 @@
+meta {
+  name: export-pdf
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/members/export?format=pdf
+  body: none
+  auth: bearer
+}
+
+params:query {
+  format: pdf
+  ~voice: S
+}
+
+auth:bearer {
+  token: {{secretaryToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Lancer d'abord `login-secretary` (token `secretaryToken`).
+  Le token doit appartenir à un compte actif et vérifié ayant le rôle `secretaire` ou `admin` (403 sinon).
+  Exporte les membres actifs, triés par nom. Le paramètre `voice` (S, A, T, B) est facultatif : le cocher
+  pour ne garder qu'une voix.
+  Nom du fichier : `membres-cff-AAAA-MM-JJ.pdf`.
+}
+
+tests {
+  test("PDF téléchargé", function () {
+    expect(res.status).to.equal(200);
+    expect(res.headers["content-type"]).to.contain("application/pdf");
+    expect(res.headers["content-disposition"]).to.contain("membres-cff-");
+  });
+}

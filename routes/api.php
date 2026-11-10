@@ -9,6 +9,7 @@ use App\Http\Controllers\MemberProfileController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SongController;
 use App\Http\Controllers\UserController;
+use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -47,6 +48,10 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
     // ── Validation des membres ──────────────────────────────────────────
     Route::post('/members/{member}/validate', [MemberController::class, 'validateAccount'])
         ->can('validate', 'member');
+
+    // ── Export de la liste des membres (Secrétaire et Admin) ────────────
+    Route::get('/members/export', [MemberController::class, 'export'])
+        ->can('export', User::class);
 
     // ── Répertoire chants ───────────────────────────────────────────────
     Route::prefix('songs')->group(function () {

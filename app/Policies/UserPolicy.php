@@ -36,4 +36,10 @@ class UserPolicy
     {
         return $user->hasRole([RoleName::Admin->value, RoleName::Secretary->value,]);
     }
+
+    // Export de la liste des membres (PDF / CSV / Excel)
+    public function export(User $user): bool
+    {
+        return $user->hasRole([RoleName::Admin->value, RoleName::Secretary->value,]);
+    }
 }
