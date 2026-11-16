@@ -78,6 +78,21 @@ class UpdateMemberProfileTest extends TestCase
         $this->assertSame('Razafy', $member->refresh()->last_name);
     }
 
+    public function test_each_word_of_the_first_name_is_stored_as_a_first_name_like_on_the_own_profile(): void
+    {
+        $member = $this->member('Rakotoarisoa', 'Hanta Rasoa', 'A');
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $this->putJson("/api/members/{$member->id}", [...self::PAYLOAD, 'first_name' => 'Fanja  Marie Soa',])
+            ->assertOk();
+
+        // Les anciens prénoms sont remplacés, un mot = une ligne, le premier est le prénom par défaut, sans ligne vide
+        $firstnames = Firstname::where('user_id', $member->id)->orderBy('order')->get();
+        $this->assertSame(['Fanja', 'Marie', 'Soa',], $firstnames->pluck('first_name')->all());
+        $this->assertSame([0, 1, 2,], $firstnames->pluck('order')->all());
+        $this->assertSame([true, false, false,], $firstnames->pluck('default')->all());
+    }
+
     public function test_a_secretary_can_change_the_voice_of_a_validated_member(): void
     {
         $member = $this->member('Rasoanaivo', 'Hanta', 'A');

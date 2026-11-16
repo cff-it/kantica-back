@@ -27,7 +27,7 @@ readonly class UpdateMemberProfileAction
 
         DB::transaction(function () use ($member, $dto, $voiceGroup, $voice): void {
             $this->profiles->updateLastName($member, $dto->lastName);
-            $this->profiles->upsertDefaultFirstname($member, $dto->firstName);
+            $this->profiles->replaceFirstnames($member, $this->splitFirstName($dto->firstName));
             $this->profiles->upsertProfile($member, [
                 'voice_group_id' => $voiceGroup->id,
                 'voice_id'       => $voice?->id,
@@ -37,5 +37,16 @@ readonly class UpdateMemberProfileAction
 
         // Rechargé depuis la base : les relations déjà chargées sur $member sont périmées
         return $this->users->findById($memberId);
+    }
+
+    /**
+     * Chaque mot du prénom saisi est un prénom à part entière ("Hanta Rasoa" donne deux lignes), comme pour la fiche
+     * personnelle (UpdateOwnProfileAction). Les espaces en trop ne créent pas de prénom vide.
+     *
+     * @return list<string>
+     */
+    private function splitFirstName(string $firstName): array
+    {
+        return array_values(array_filter(explode(' ', $firstName), fn (string $word) => $word !== ''));
     }
 }
