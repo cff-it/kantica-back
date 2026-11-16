@@ -1,0 +1,45 @@
+meta {
+  name: import-preview
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/users/import/preview
+  body: multipartForm
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{secretaryToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+body:multipart-form {
+  file: @file(users/membres-cff.xlsx)
+}
+
+docs {
+  Vérifie le fichier sans rien écrire en base (écran « Vérification »). Lancer d'abord `members/login-secretary`.
+  `users/membres-cff.xlsx` contient 6 lignes : 4 valides, la ligne 5 (voix « Mezzo ») et la ligne 6 (email manquant) à corriger.
+  Une ligne dont l'email a déjà un compte est rangée dans `skipped` (le compte n'est pas modifié) : après un import,
+  les 4 lignes valides passent donc de `ready` à `skipped`.
+  Le chemin du fichier est relatif à la racine de la collection Bruno.
+}
+
+tests {
+  test("fichier analysé sans écriture", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data.total).to.equal(6);
+    expect(res.body.data.error_count).to.equal(2);
+    expect(res.body.data.ready_count + res.body.data.skipped_count).to.equal(4);
+  });
+
+  test("erreurs signalées avec la ligne Excel", function () {
+    expect(res.body.data.errors[0].line).to.equal(5);
+    expect(res.body.data.errors[1].line).to.equal(6);
+  });
+}

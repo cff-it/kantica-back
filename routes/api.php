@@ -9,6 +9,7 @@ use App\Http\Controllers\MemberProfileController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SongController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\UserImportController;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
@@ -73,6 +74,13 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
 
     // ── Membres & rôles ─────────────────────────────────────────────────
     Route::prefix('users')->group(function () {
+        // Import Excel (KAN-31) : déclaré avant `/{user}` ; réservé à l'admin et à la secrétaire
+        Route::prefix('import')->middleware('can:import,'.User::class)->group(function () {
+            Route::get('/template', [UserImportController::class, 'template']);
+            Route::post('/preview', [UserImportController::class, 'preview']);
+            Route::post('/', [UserImportController::class, 'import']);
+        });
+
         Route::get('/', [UserController::class, 'index']);
         Route::post('/', [UserController::class, 'store']);
         Route::get('/{user}', [UserController::class, 'show']);

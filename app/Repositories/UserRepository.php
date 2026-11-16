@@ -6,6 +6,7 @@ use App\Enums\UserStatus;
 use App\Enums\VoicePart;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class UserRepository
 {
@@ -51,6 +52,50 @@ class UserRepository
     public function create(array $data): User
     {
         return User::create($data);
+    }
+
+    // Compte créé par la chorale (import) : actif et email considéré comme vérifié, sans lien envoyé
+    public function createActive(array $data): User
+    {
+        $user = new User($data);
+        $user->forceFill([
+            'status'            => UserStatus::Active,
+            'email_verified_at' => now(),
+        ])->save();
+
+        return $user;
+    }
+
+    /**
+     * @param  list<string>  $mails  emails en minuscules
+     * @return list<string> emails (en minuscules) déjà utilisés par un compte
+     */
+    public function existingMails(array $mails): array
+    {
+        return User::whereIn(DB::raw('lower(mail)'), $mails)
+            ->pluck('mail')
+            ->map(fn (string $mail): string => mb_strtolower($mail))
+            ->all();
+    }
+
+    /**
+     * Nom et prénoms de tous les comptes, pour repérer les doublons à l'import (la chorale compte quelques centaines de membres).
+     * default_first_name : prénom par défaut seul ; first_names : tous les prénoms à la suite, dans l'ordre.
+     *
+     * @return list<array{last_name: string, default_first_name: string|null, first_names: string}>
+     */
+    public function memberNames(): array
+    {
+        return User::query()
+            ->select(['id', 'last_name',])
+            ->with('firstnames')
+            ->get()
+            ->map(fn (User $user): array => [
+                'last_name'          => $user->last_name,
+                'default_first_name' => $user->firstnames->firstWhere('default', true)?->first_name,
+                'first_names'        => $user->firstnames->pluck('first_name')->implode(' '),
+            ])
+            ->all();
     }
 
     // Données nécessaires au front pour router l'utilisateur courant et afficher sa fiche

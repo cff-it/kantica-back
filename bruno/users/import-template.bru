@@ -1,0 +1,29 @@
+meta {
+  name: import-template
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/users/import/template
+  body: none
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("modèle xlsx renvoyé", function () {
+    expect(res.status).to.equal(200);
+    expect(res.getHeader("content-type")).to.contain("spreadsheetml.sheet");
+    expect(res.getHeader("content-disposition")).to.contain("modele-import-membres.xlsx");
+  });
+}
+
+docs {
+  Télécharge le modèle Excel (`modele-import-membres.xlsx`) : une feuille « Membres » avec les colonnes
+  `Nom`, `Prénom`, `Voix (S, A, T ou B)`, `Téléphone`, `Email`.
+  Lancer d'abord `members/login-secretary` (token `secretaryToken`, compte `secretaire` ou `admin` actif et vérifié).
+}

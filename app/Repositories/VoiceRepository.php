@@ -33,4 +33,12 @@ class VoiceRepository
             'name'           => $name,
         ]);
     }
+
+    /**
+     * @return array<string, int> identifiant de chaque groupe de voix, indexé par son abréviation (S, A, T, B)
+     */
+    public function groupIdsByAbbreviation(): array
+    {
+        return VoiceGroup::pluck('id', 'abbreviation')->all();
+    }
 }

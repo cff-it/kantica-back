@@ -91,9 +91,10 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasOne(UserProfile::class);
     }
 
-    public function sacrament(): HasOne
+    // Une ligne par sacrement (baptême, première communion, confirmation, mariage)
+    public function sacraments(): HasMany
     {
-        return $this->hasOne(UserSacrament::class);
+        return $this->hasMany(UserSacrament::class);
     }
 
     public function engagement(): HasOne

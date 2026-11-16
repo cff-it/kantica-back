@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $birth_place
  * @property string|null $region_registration_number
  * @property string|null $picture_url
+ * @property string|null $social_pseudo
  * @property Carbon $created_at
  * @property Carbon $updated_at
  */
@@ -35,6 +36,7 @@ class UserProfile extends Model
         'birth_place',
         'region_registration_number',
         'picture_url',
+        'social_pseudo',
     ];
 
     protected function casts(): array
