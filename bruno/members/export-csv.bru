@@ -1,0 +1,36 @@
+meta {
+  name: export-csv
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/members/export?format=csv
+  body: none
+  auth: inherit
+}
+
+params:query {
+  format: csv
+  ~voice: S
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("CSV téléchargé", function () {
+    expect(res.status).to.equal(200);
+    expect(res.headers["content-type"]).to.contain("text/csv");
+    expect(res.headers["content-disposition"]).to.contain("membres-cff-");
+  });
+}
+
+docs {
+  Lancer d'abord `login-secretary` (token `secretaryToken`).
+  Le token doit appartenir à un compte actif et vérifié ayant le rôle `secretaire` ou `admin` (403 sinon).
+  Exporte les membres actifs, triés par nom. Le paramètre `voice` (S, A, T, B) est facultatif : le cocher
+  pour ne garder qu'une voix.
+  CSV en UTF-8 avec BOM, séparateur `;` (ouverture directe dans Excel). Nom du fichier : `membres-cff-AAAA-MM-JJ.csv`.
+}

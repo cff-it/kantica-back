@@ -1,0 +1,36 @@
+meta {
+  name: verify-email
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{verificationUrl}}
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  // Sans lien collé dans `verificationUrl`, la requête est ignorée lors d'un « Run » de la collection
+  if (!bru.getVar("verificationUrl") && bru.runner && bru.runner.skipRequest) {
+    bru.runner.skipRequest();
+  }
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Lien signé reçu par email, valable 60 minutes, ouvert sans token.
+
+  En local (`MAIL_MAILER=log`), copier le lien depuis `storage/logs/laravel.log`
+  (`http://localhost:8008/api/email/verify/{user}/{hash}?expires=...&signature=...`)
+  dans la variable `verificationUrl` (onglet Vars de la requête ou variables de la collection).
+}
+
+tests {
+  test("email vérifié", function () {
+    expect(res.status).to.equal(200);
+  });
+}
