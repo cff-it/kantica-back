@@ -42,4 +42,10 @@ class UserPolicy
     {
         return $user->hasRole([RoleName::Admin->value, RoleName::Secretary->value,]);
     }
+
+    // Import de membres depuis un fichier Excel (KAN-31)
+    public function import(User $user): bool
+    {
+        return $user->hasRole([RoleName::Admin->value, RoleName::Secretary->value,]);
+    }
 }
