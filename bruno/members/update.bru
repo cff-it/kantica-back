@@ -1,0 +1,52 @@
+meta {
+  name: update
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/members/{{memberId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{secretaryToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+body:json {
+  {
+    "last_name": "Rasoanaivo",
+    "first_name": "Hanta",
+    "voice_group": "A",
+    "voice": "A2",
+    "phone": "034 12 345 67"
+  }
+}
+
+docs {
+  Modifie la fiche d'un membre (créée si elle n'existe pas encore). Lancer d'abord `login-secretary` (token `secretaryToken`)
+  et `auth/register` (`memberId`). Le token doit appartenir à un compte actif et vérifié ayant le rôle `secretaire` ou `admin`
+  (403 sinon).
+
+  Mêmes champs et mêmes validations que `me/profile-put` : `voice_group` (S, A, T ou B, obligatoire), `voice` (S1, A2...,
+  facultative, doit appartenir au groupe), `last_name`, `first_name` et `phone` obligatoires.
+  La secrétaire et l'admin peuvent changer la voix d'un membre.
+
+  L'email, le statut et les rôles du compte ne sont pas modifiables ici : tout champ `mail`, `contact_mail` ou `status` envoyé est ignoré.
+  La réponse est identique à `members/show`.
+}
+
+tests {
+  test("fiche modifiée", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data.id).to.equal(bru.getVar("memberId"));
+    expect(res.body.data.profile.completed).to.equal(true);
+    expect(res.body.data.profile.voice_group).to.equal("A");
+    expect(res.body.data.profile.voice).to.equal("A2");
+  });
+}
