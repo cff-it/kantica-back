@@ -22,6 +22,16 @@ class MemberProfileRepository
         $user->update(['last_name' => $lastName,]);
     }
 
+    // Le prénom saisi est le prénom par défaut (les autres prénoms restent intacts). Utilisé par l'import des membres
+    // (KAN-31), qui garde le prénom d'un compte importé en une seule ligne ; les fiches utilisent replaceFirstnames()
+    public function upsertDefaultFirstname(User $user, string $firstName): void
+    {
+        Firstname::updateOrCreate(
+            ['user_id' => $user->id, 'default' => true,],
+            ['first_name' => $firstName, 'order' => 0,],
+        );
+    }
+
     /**
      * Remplace tous les prénoms de l'utilisateur : un mot = une ligne, dans l'ordre de saisie.
      * Le premier mot est le prénom par défaut.
