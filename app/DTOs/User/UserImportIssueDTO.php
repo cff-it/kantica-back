@@ -10,4 +10,16 @@ class UserImportIssueDTO
         public readonly ?string $name,
         public readonly string $message,
     ) {}
+
+    /**
+     * @return array{line: int, name: string|null, message: string}
+     */
+    public function toArray(): array
+    {
+        return [
+            'line'    => $this->line,
+            'name'    => $this->name,
+            'message' => $this->message,
+        ];
+    }
 }

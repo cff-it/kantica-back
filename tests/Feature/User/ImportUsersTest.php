@@ -3,11 +3,15 @@
 namespace Tests\Feature\User;
 
 use App\Actions\User\AnalyzeUsersImportAction;
+use App\Actions\User\RunUsersImportAction;
 use App\Enums\RoleName;
+use App\Enums\UserImportStatus;
 use App\Enums\UserStatus;
 use App\Http\Middleware\EnsureAccountIsActive;
+use App\Jobs\ImportUsersJob;
 use App\Models\Firstname;
 use App\Models\User;
+use App\Models\UserImport;
 use App\Models\UserSacrament;
 use App\Repositories\UserRepository;
 use Closure;
@@ -18,10 +22,12 @@ use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
@@ -31,6 +37,7 @@ use OpenSpout\Reader\XLSX\Options as ReaderOptions;
 use OpenSpout\Reader\XLSX\Reader;
 use OpenSpout\Writer\XLSX\Writer;
 use PHPUnit\Framework\Attributes\DataProvider;
+use RuntimeException;
 use Tests\TestCase;
 
 class ImportUsersTest extends TestCase
@@ -83,6 +90,8 @@ class ImportUsersTest extends TestCase
         $this->seed([RoleSeeder::class, VoiceSeeder::class,]);
         Notification::fake();
         Storage::fake('public');
+        // Fichier envoyé, gardé sur le disque privé le temps de l'import
+        Storage::fake('local');
 
         // Aucun test ne doit joindre le vrai Google Drive
         $this->driveResponse = fn (): PromiseInterface => Http::response(
@@ -667,7 +676,7 @@ class ImportUsersTest extends TestCase
             ->assertJsonPath('data.ignored_columns', ['Horodateur',]);
     }
 
-    public function test_the_template_has_no_ignored_column_and_no_warning(): void
+    public function test_a_file_with_the_short_columns_has_no_ignored_column_and_no_warning(): void
     {
         Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
 
@@ -1320,8 +1329,9 @@ class ImportUsersTest extends TestCase
         $response->assertOk()
             ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             ->assertDownload('modele-import-membres.xlsx');
+        // Les 25 en-têtes du formulaire de recensement, dans l'ordre de l'onglet « Réponses »
         $this->assertSame(
-            [self::HEADER,],
+            [self::FORM_HEADER,],
             $this->readWorkbook($response->streamedContent()),
         );
     }
@@ -1338,11 +1348,13 @@ class ImportUsersTest extends TestCase
         Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
 
         $headers = $this->readWorkbook($this->get('/api/users/import/template')->streamedContent())[0];
-        $this->assertSame(self::HEADER, $headers);
+        $this->assertSame(self::FORM_HEADER, $headers);
 
-        $this->previewFile([$headers, $this->validRow(),])
+        // Seule « Horodateur » n'est pas reprise : le modèle rempli est lu comme un export du formulaire
+        $this->previewFile([$headers, $this->formRow('RAKOTO Exemple', 'rakoto@example.com', '034 00 000 01', 'Ténor'),])
             ->assertOk()
-            ->assertJsonPath('data.ready_count', 1);
+            ->assertJsonPath('data.ready_count', 1)
+            ->assertJsonPath('data.ignored_columns', ['Horodateur',]);
     }
 
     // ── Autorisations ───────────────────────────────────────────────────
@@ -1386,6 +1398,257 @@ class ImportUsersTest extends TestCase
             ->assertJsonPath('code', EnsureAccountIsActive::ERROR_CODE);
 
         $this->assertSame($usersBefore, User::count());
+    }
+
+    // ── Import en tâche de fond : POST /api/users/import puis GET /api/users/import/{id} ──
+
+    public function test_the_import_is_queued_and_answers_202_with_its_progress(): void
+    {
+        Queue::fake();
+        $secretary = $this->userWithRole(RoleName::Secretary);
+        Sanctum::actingAs($secretary);
+        $usersBefore = User::count();
+
+        // Deux comptes et une photo : 3 étapes
+        $response = $this->postJson('/api/users/import', ['file' => $this->xlsx([
+            self::FORM_HEADER,
+            $this->photoRow('RAKOTO Exemple', 'rakoto@example.com'),
+            $this->formRow('RABE Exemple', 'rabe@example.com', '034 00 000 02', 'Alto', ["Photo d'identité récente" => '',]),
+        ]),]);
+
+        $response->assertStatus(202)
+            ->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.progress', ['processed' => 0, 'total' => 3, 'percent' => 0,])
+            ->assertJsonPath('data.report', null)
+            ->assertJsonPath('data.error', null);
+
+        $import = UserImport::findOrFail($response->json('data.id'));
+        $this->assertSame($secretary->id, $import->user_id);
+        Queue::assertPushed(ImportUsersJob::class, fn (ImportUsersJob $job): bool => $job->userImportId === $import->id);
+        Storage::disk('local')->assertExists($import->file_path);
+        // Rien n'est créé tant que le worker n'a pas traité l'import
+        $this->assertSame($usersBefore, User::count());
+    }
+
+    public function test_the_worker_imports_the_members_and_finishes_at_100_percent(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        // La file est synchrone en test : le traitement est déjà fini au retour du POST
+        $this->postJson('/api/users/import', ['file' => $this->xlsx([self::HEADER, $this->validRow(),]),])
+            ->assertStatus(202)
+            ->assertJsonPath('data.status', 'completed')
+            ->assertJsonPath('data.progress', ['processed' => 1, 'total' => 1, 'percent' => 100,])
+            ->assertJsonPath('data.report.total', 1)
+            ->assertJsonPath('data.report.created', 1)
+            ->assertJsonPath('data.error', null);
+
+        $this->assertDatabaseHas('users', ['mail' => 'fanja@example.com',]);
+    }
+
+    public function test_the_uploaded_file_is_deleted_once_the_import_is_done(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $id = $this->postJson('/api/users/import', ['file' => $this->xlsx([self::HEADER, $this->validRow(),]),])
+            ->assertStatus(202)
+            ->json('data.id');
+
+        $this->assertNull(UserImport::findOrFail($id)->file_path);
+        Storage::disk('local')->assertDirectoryEmpty(UserImport::FILE_DIRECTORY);
+    }
+
+    public function test_a_file_that_cannot_be_read_is_refused_before_anything_is_queued(): void
+    {
+        Queue::fake();
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $this->postJson('/api/users/import', ['file' => $this->xlsx([['Nom', 'Téléphone',], ['Rakoto', '034',],]),])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('file');
+
+        Queue::assertNothingPushed();
+        $this->assertDatabaseCount('user_imports', 0);
+        Storage::disk('local')->assertDirectoryEmpty(UserImport::FILE_DIRECTORY);
+    }
+
+    public function test_the_progress_advances_while_the_photos_are_downloaded(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+        $seen = null;
+
+        // Pendant le téléchargement du lot de photos, les deux comptes sont créés mais pas les photos : 2 étapes sur 4
+        $this->driveResponse = function () use (&$seen): PromiseInterface {
+            $import = UserImport::firstOrFail();
+            $seen ??= [$import->status->value, $import->processed, $import->total,];
+
+            return Http::response(base64_decode(self::PNG_BASE64), 200, ['Content-Type' => 'image/png',]);
+        };
+
+        $this->postJson('/api/users/import', ['file' => $this->xlsx([
+            self::FORM_HEADER,
+            $this->photoRow('RAKOTO Exemple', 'rakoto@example.com'),
+            $this->photoRow('RABE Exemple', 'rabe@example.com'),
+        ]),])
+            ->assertStatus(202)
+            ->assertJsonPath('data.progress', ['processed' => 4, 'total' => 4, 'percent' => 100,]);
+
+        $this->assertSame(['running', 2, 4,], $seen);
+    }
+
+    public function test_a_failed_photo_still_counts_as_a_finished_step(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+        $this->driveResponse = fn (): PromiseInterface => Http::response('', 404);
+
+        $this->postJson('/api/users/import', ['file' => $this->xlsx([
+            self::FORM_HEADER,
+            $this->photoRow('RAKOTO Exemple', 'rakoto@example.com'),
+        ]),])
+            ->assertStatus(202)
+            ->assertJsonPath('data.status', 'completed')
+            ->assertJsonPath('data.progress', ['processed' => 2, 'total' => 2, 'percent' => 100,])
+            ->assertJsonPath('data.report.created', 1)
+            ->assertJsonPath('data.report.warning_count', 1);
+    }
+
+    public function test_the_owner_can_read_the_progress_and_the_final_report(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $id = $this->postJson('/api/users/import', ['file' => $this->xlsx([self::HEADER, $this->validRow(),]),])
+            ->json('data.id');
+
+        $this->getJson('/api/users/import/'.$id)
+            ->assertOk()
+            ->assertJsonPath('data.id', $id)
+            ->assertJsonPath('data.status', 'completed')
+            ->assertJsonPath('data.progress.percent', 100)
+            ->assertJsonPath('data.report.created', 1)
+            ->assertJsonPath('data.report.skipped', [])
+            ->assertJsonPath('data.report.errors', []);
+    }
+
+    public function test_only_the_owner_and_an_admin_can_read_an_import(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+        $id = $this->postJson('/api/users/import', ['file' => $this->xlsx([self::HEADER, $this->validRow(),]),])
+            ->json('data.id');
+
+        // Une autre secrétaire ne voit ni l'avancement ni les noms du rapport
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+        $this->getJson('/api/users/import/'.$id)->assertForbidden();
+
+        Sanctum::actingAs($this->userWithRole(RoleName::Admin));
+        $this->getJson('/api/users/import/'.$id)
+            ->assertOk()
+            ->assertJsonPath('data.report.created', 1);
+    }
+
+    public function test_a_member_and_a_guest_cannot_read_an_import(): void
+    {
+        $import = $this->importOf($this->userWithRole(RoleName::Secretary));
+
+        $this->getJson('/api/users/import/'.$import->id)->assertUnauthorized();
+
+        Sanctum::actingAs($this->userWithRole(RoleName::Member));
+        $this->getJson('/api/users/import/'.$import->id)->assertForbidden();
+    }
+
+    public function test_an_unknown_import_is_not_found(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $this->getJson('/api/users/import/999999')->assertNotFound();
+        $this->getJson('/api/users/import/abc')->assertNotFound();
+    }
+
+    #[DataProvider('progressPercents')]
+    public function test_the_percent_follows_the_steps_and_reaches_100_only_when_completed(
+        UserImportStatus $status,
+        int $total,
+        int $processed,
+        int $percent,
+    ): void {
+        $owner = $this->userWithRole(RoleName::Secretary);
+        Sanctum::actingAs($owner);
+        $import = $this->importOf($owner, $status, $total, $processed);
+
+        $this->getJson('/api/users/import/'.$import->id)
+            ->assertOk()
+            ->assertJsonPath('data.status', $status->value)
+            ->assertJsonPath('data.progress', ['processed' => $processed, 'total' => $total, 'percent' => $percent,]);
+    }
+
+    /**
+     * @return array<string, array{UserImportStatus, int, int, int}>
+     */
+    public static function progressPercents(): array
+    {
+        return [
+            'pending, total not known yet'             => [UserImportStatus::Pending, 0, 0, 0,],
+            'pending, nothing done'                    => [UserImportStatus::Pending, 4, 0, 0,],
+            'running, a quarter'                       => [UserImportStatus::Running, 4, 1, 25,],
+            'running, a third is rounded down'         => [UserImportStatus::Running, 3, 1, 33,],
+            'running, all steps done, report not yet'  => [UserImportStatus::Running, 4, 4, 99,],
+            'completed'                                => [UserImportStatus::Completed, 4, 4, 100,],
+            'completed, nothing to import'             => [UserImportStatus::Completed, 0, 0, 100,],
+            'failed keeps the progress it reached'     => [UserImportStatus::Failed, 4, 2, 50,],
+        ];
+    }
+
+    public function test_a_failed_job_marks_the_import_failed_and_deletes_the_file(): void
+    {
+        Queue::fake();
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+        $id = $this->postJson('/api/users/import', ['file' => $this->xlsx([self::HEADER, $this->validRow(),]),])
+            ->assertStatus(202)
+            ->json('data.id');
+        $path = UserImport::findOrFail($id)->file_path;
+        Storage::disk('local')->assertExists($path);
+
+        // Appelé par la file quand le Job lève une exception ou dépasse son délai
+        (new ImportUsersJob($id))->failed(new RuntimeException('boom'));
+
+        Storage::disk('local')->assertMissing($path);
+        $this->getJson('/api/users/import/'.$id)
+            ->assertOk()
+            ->assertJsonPath('data.status', 'failed')
+            ->assertJsonPath('data.report', null)
+            ->assertJsonPath(
+                'data.error',
+                "L'import a été interrompu par une erreur. Les membres déjà créés sont conservés : relancez le même fichier pour créer les autres.",
+            );
+    }
+
+    public function test_a_finished_import_is_not_replayed_when_the_job_is_delivered_twice(): void
+    {
+        Queue::fake();
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+        $id = $this->postJson('/api/users/import', ['file' => $this->xlsx([self::HEADER, $this->validRow(),]),])
+            ->json('data.id');
+        $job = new ImportUsersJob($id);
+
+        $job->handle(app(RunUsersImportAction::class));
+        $usersAfterFirstRun = User::count();
+        $report = UserImport::findOrFail($id)->report;
+
+        // Livré une seconde fois : rien ne change, et le fichier supprimé n'est pas relu
+        $job->handle(app(RunUsersImportAction::class));
+
+        $this->assertSame($usersAfterFirstRun, User::count());
+        $this->assertSame($report, UserImport::findOrFail($id)->report);
+        $this->assertSame(1, $report['created']);
+    }
+
+    public function test_the_job_is_a_single_long_attempt_that_the_queue_does_not_hand_out_twice(): void
+    {
+        $job = new ImportUsersJob(1);
+
+        $this->assertSame(1, $job->tries);
+        $this->assertTrue($job->failOnTimeout);
+        // Sinon un second worker reprendrait l'import encore en cours
+        $this->assertLessThan((int) config('queue.connections.database.retry_after'), $job->timeout);
     }
 
     // ── Outils ──────────────────────────────────────────────────────────
@@ -1477,11 +1740,36 @@ class ImportUsersTest extends TestCase
     }
 
     /**
+     * Lance l'import et renvoie son rapport final dans `data`. La file est synchrone en test : au retour du POST le
+     * traitement est fini. Un refus (422, 403, 401) est renvoyé tel quel.
+     *
      * @param  list<list<mixed>>  $rows
      */
     private function importFile(array $rows): TestResponse
     {
-        return $this->postJson('/api/users/import', ['file' => $this->xlsx($rows),]);
+        $response = $this->postJson('/api/users/import', ['file' => $this->xlsx($rows),]);
+
+        if ($response->status() !== 202) {
+            return $response;
+        }
+
+        $response->assertJsonPath('data.status', 'completed');
+
+        return TestResponse::fromBaseResponse(new JsonResponse(['data' => $response->json('data.report'),]));
+    }
+
+    private function importOf(
+        User $owner,
+        UserImportStatus $status = UserImportStatus::Pending,
+        int $total = 0,
+        int $processed = 0,
+    ): UserImport {
+        return UserImport::create([
+            'user_id'   => $owner->id,
+            'status'    => $status,
+            'total'     => $total,
+            'processed' => $processed,
+        ]);
     }
 
     /**

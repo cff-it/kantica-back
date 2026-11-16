@@ -3,6 +3,7 @@
 namespace App\Http\Requests\User;
 
 use App\DTOs\User\ImportUsersDTO;
+use App\DTOs\User\StartUsersImportDTO;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ImportUsersRequest extends FormRequest
@@ -37,5 +38,13 @@ class ImportUsersRequest extends FormRequest
     public function toDTO(): ImportUsersDTO
     {
         return new ImportUsersDTO(path: $this->file('file')->getRealPath());
+    }
+
+    public function toStartDTO(): StartUsersImportDTO
+    {
+        return new StartUsersImportDTO(
+            path: $this->file('file')->getRealPath(),
+            userId: $this->user()->id,
+        );
     }
 }

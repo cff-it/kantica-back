@@ -19,4 +19,13 @@ class UsersImportAnalysisDTO
         public readonly array $warnings = [],
         public readonly array $ignoredColumns = [],
     ) {}
+
+    // Étapes de l'import, base du pourcentage : un compte à créer par ligne prête, plus une photo à télécharger
+    // pour chaque ligne qui en a une
+    public function steps(): int
+    {
+        $withPicture = array_filter($this->ready, fn (UserImportRowDTO $row): bool => $row->pictureUrl !== null);
+
+        return count($this->ready) + count($withPicture);
+    }
 }

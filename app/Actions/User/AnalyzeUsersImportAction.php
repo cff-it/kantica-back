@@ -24,7 +24,7 @@ use OpenSpout\Reader\XLSX\Reader;
 // Sert à l'aperçu et à l'import, qui rejouent la même analyse.
 readonly class AnalyzeUsersImportAction
 {
-    // Au-delà, l'import dépasserait le temps d'une requête HTTP
+    // Limite d'un import : durée du traitement (un compte et une photo par ligne) et lisibilité du rapport
     public const int MAX_ROWS = 500;
 
     // En-têtes reconnus (sans accents, casse ni parenthèses) et champ correspondant

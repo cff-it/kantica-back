@@ -79,6 +79,10 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
             Route::get('/template', [UserImportController::class, 'template']);
             Route::post('/preview', [UserImportController::class, 'preview']);
             Route::post('/', [UserImportController::class, 'import']);
+            // Suivi d'un import en tâche de fond : réservé à celui qui l'a lancé et à l'admin (UserImportPolicy)
+            Route::get('/{userImport}', [UserImportController::class, 'show'])
+                ->whereNumber('userImport')
+                ->middleware('can:view,userImport');
         });
 
         Route::get('/', [UserController::class, 'index']);

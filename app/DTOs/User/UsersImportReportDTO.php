@@ -18,4 +18,26 @@ class UsersImportReportDTO
         public readonly array $warnings = [],
         public readonly array $ignoredColumns = [],
     ) {}
+
+    /**
+     * Forme enregistrée dans `user_imports.report` et renvoyée au front dans `report`.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        $issue = fn (UserImportIssueDTO $issue): array => $issue->toArray();
+
+        return [
+            'total'           => $this->total,
+            'created'         => $this->created,
+            'skipped_count'   => count($this->skipped),
+            'error_count'     => count($this->errors),
+            'warning_count'   => count($this->warnings),
+            'skipped'         => array_map($issue, $this->skipped),
+            'errors'          => array_map($issue, $this->errors),
+            'warnings'        => array_map($issue, $this->warnings),
+            'ignored_columns' => $this->ignoredColumns,
+        ];
+    }
 }

@@ -22,20 +22,28 @@ body:multipart-form {
   file: @file(users/membres-cff.xlsx)
 }
 
+script:post-response {
+  if (res.status === 202) {
+    bru.setVar("importId", res.body.data.id);
+  }
+}
+
 docs {
-  Importe les lignes valides du fichier (import partiel). Lancer d'abord `members/login-secretary`.
+  Lance l'import en tâche de fond et répond tout de suite `202` avec `data.id` (retenu dans `importId`).
+  Lancer d'abord `members/login-secretary`, puis suivre l'avancement avec `users/import-status`.
+  Il faut un worker de file d'attente : `docker compose up -d queue` (sans lui, l'import reste `pending`).
+  Un fichier illisible, vide ou sans les colonnes obligatoires est refusé tout de suite en 422 : rien n'est mis en file.
   Chaque ligne valide crée un compte actif, avec le rôle `membre`, sa fiche (voix, téléphone) et son prénom.
-  Les lignes invalides sont renvoyées dans `errors` (ligne Excel, nom, motif) et ne créent rien.
-  Un email déjà utilisé est ignoré (`skipped`) : relancer la requête ne crée aucun doublon.
+  Les lignes invalides sont renvoyées dans `report.errors` (ligne Excel, nom, motif) et ne créent rien.
+  Un email déjà utilisé est ignoré (`report.skipped`) : relancer la requête ne crée aucun doublon.
   Aucun email n'est envoyé et le mot de passe est aléatoire (inconnu de tous) : les comptes importés ne peuvent
   pas encore se connecter tant qu'un parcours de mot de passe n'existe pas.
 }
 
 tests {
-  test("lignes valides importées, les autres rapportées", function () {
-    expect(res.status).to.equal(200);
-    expect(res.body.data.total).to.equal(6);
-    expect(res.body.data.error_count).to.equal(2);
-    expect(res.body.data.created + res.body.data.skipped_count).to.equal(4);
+  test("import accepté et mis en file", function () {
+    expect(res.status).to.equal(202);
+    expect(res.body.data.id).to.be.a("number");
+    expect(["pending", "running", "completed"]).to.include(res.body.data.status);
   });
 }

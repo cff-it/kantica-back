@@ -2,6 +2,7 @@
 
 namespace App\Actions\User;
 
+use Closure;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -12,7 +13,8 @@ use RuntimeException;
 
 // Télécharge les photos d'identité (liens Google Drive du formulaire) dans le dossier de l'application :
 // `storage/app/public/members/photos`. Ces fichiers sont ceux qu'on sauvegardera ensuite dans un Drive.
-// Dix photos à la fois, et pas plus de 40 secondes en tout : la requête d'import doit finir avant le délai de nginx (60 s).
+// Dix photos à la fois, et pas plus de 300 secondes en tout : l'import tourne en tâche de fond (`ImportUsersJob`,
+// 600 secondes au plus), donc le délai de nginx ne s'applique plus.
 readonly class StoreMemberPhotosAction
 {
     private const string DOWNLOAD_URL = 'https://drive.usercontent.google.com/download';
@@ -27,7 +29,7 @@ readonly class StoreMemberPhotosAction
 
     private const int TIMEOUT_SECONDS = 10;
 
-    private const int BUDGET_SECONDS = 40;
+    private const int BUDGET_SECONDS = 300;
 
     private const array EXTENSIONS = [
         IMAGETYPE_JPEG => 'jpg',
@@ -42,38 +44,69 @@ readonly class StoreMemberPhotosAction
 
     /**
      * @param  array<int, string>  $links  lien Drive de la photo, indexé par l'identifiant de l'utilisateur
+     * @param  (Closure(array<int, array{url: string|null, warning: string|null}>): void)|null  $onChunk  appelée après chaque lot
+     *                                                                                                    avec ses résultats : l'appelant les enregistre et fait avancer son suivi
      * @return array<int, array{url: string|null, warning: string|null}> URL de la photo enregistrée, ou raison de l'échec
      */
-    public function __invoke(array $links): array
+    public function __invoke(array $links, ?Closure $onChunk = null): array
     {
         $startedAt = microtime(true);
         $results = [];
 
         foreach (array_chunk($links, self::CHUNK_SIZE, true) as $chunk) {
-            if (microtime(true) - $startedAt > self::BUDGET_SECONDS) {
-                foreach ($chunk as $userId => $link) {
-                    $results[$userId] = $this->failure("délai de l'import dépassé");
-                }
+            $chunkResults = microtime(true) - $startedAt > self::BUDGET_SECONDS
+                ? $this->skip($chunk)
+                : $this->download($chunk);
 
-                continue;
+            // Les clés sont des identifiants d'utilisateur, jamais en double d'un lot à l'autre
+            $results += $chunkResults;
+
+            if ($onChunk !== null) {
+                $onChunk($chunkResults);
             }
+        }
 
-            $responses = Http::pool(function (Pool $pool) use ($chunk): void {
-                foreach ($chunk as $userId => $link) {
-                    $pool->as((string) $userId)
-                        ->timeout(self::TIMEOUT_SECONDS)
-                        ->withOptions(['on_headers' => $this->refuseHeavyFile(...),])
-                        ->get(self::DOWNLOAD_URL, [
-                            'id'      => ($this->extractFileId)($link),
-                            'export'  => 'download',
-                            'confirm' => 't',
-                        ]);
-                }
-            });
+        return $results;
+    }
 
+    /**
+     * @param  array<int, string>  $chunk
+     * @return array<int, array{url: string|null, warning: string|null}>
+     */
+    private function download(array $chunk): array
+    {
+        $responses = Http::pool(function (Pool $pool) use ($chunk): void {
             foreach ($chunk as $userId => $link) {
-                $results[$userId] = $this->store($responses[(string) $userId] ?? null);
+                $pool->as((string) $userId)
+                    ->timeout(self::TIMEOUT_SECONDS)
+                    ->withOptions(['on_headers' => $this->refuseHeavyFile(...),])
+                    ->get(self::DOWNLOAD_URL, [
+                        'id'      => ($this->extractFileId)($link),
+                        'export'  => 'download',
+                        'confirm' => 't',
+                    ]);
             }
+        });
+
+        $results = [];
+
+        foreach ($chunk as $userId => $link) {
+            $results[$userId] = $this->store($responses[(string) $userId] ?? null);
+        }
+
+        return $results;
+    }
+
+    /**
+     * @param  array<int, string>  $chunk
+     * @return array<int, array{url: null, warning: string}>
+     */
+    private function skip(array $chunk): array
+    {
+        $results = [];
+
+        foreach ($chunk as $userId => $link) {
+            $results[$userId] = $this->failure("délai de l'import dépassé");
         }
 
         return $results;

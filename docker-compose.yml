@@ -20,6 +20,27 @@ services:
       - db
       - redis
 
+  # Worker de la file d'attente : traite les imports de membres lancés en tâche de fond (KAN-31). Sans lui, un import
+  # reste « pending ». `queue:listen` recharge le code à chaque tâche, ce que `queue:work` ne fait pas.
+  queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kantica-back-queue
+    restart: unless-stopped
+    working_dir: /var/www
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    command: php artisan queue:listen --tries=1 --timeout=600
+    environment:
+      COMPOSER_HOME: /tmp/composer
+    volumes:
+      - .:/var/www
+      - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+    networks:
+      - kantica-network
+    depends_on:
+      - db
+
   nginx:
     image: nginx:alpine
     container_name: kantica-back-nginx

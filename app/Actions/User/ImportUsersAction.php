@@ -8,7 +8,9 @@ use App\DTOs\User\UserImportRowDTO;
 use App\DTOs\User\UsersImportReportDTO;
 use App\Enums\RoleName;
 use App\Enums\SacramentType;
+use App\Models\UserImport;
 use App\Repositories\MemberProfileRepository;
+use App\Repositories\UserImportRepository;
 use App\Repositories\UserRepository;
 use App\Repositories\VoiceRepository;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -16,7 +18,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
-// Import partiel : les lignes valides sont créées, les lignes invalides et les comptes déjà existants sont rapportés
+// Import partiel : les lignes valides sont créées, les lignes invalides et les comptes déjà existants sont rapportés.
+// Fait avancer le suivi (`UserImport`) à chaque compte créé et à chaque lot de photos : une étape par compte, plus une
+// par photo à télécharger. Appelée par `RunUsersImportAction`, depuis `ImportUsersJob`.
 readonly class ImportUsersAction
 {
     public function __construct(
@@ -25,15 +29,19 @@ readonly class ImportUsersAction
         private MemberProfileRepository $profiles,
         private VoiceRepository $voices,
         private StoreMemberPhotosAction $photos,
+        private UserImportRepository $imports,
     ) {}
 
-    public function __invoke(ImportUsersDTO $dto): UsersImportReportDTO
+    public function __invoke(ImportUsersDTO $dto, UserImport $import): UsersImportReportDTO
     {
         $analysis = ($this->analyze)($dto);
         $groups = $this->voices->groupIdsByAbbreviation();
 
+        // Le total est celui de cette analyse : des membres ont pu être créés depuis l'envoi du fichier
+        $this->imports->start($import, $analysis->steps());
+
         // Mot de passe aléatoire que personne ne connaît : le membre en choisira un autre.
-        // Haché une seule fois : bcrypt est volontairement lent et multiplié par 500 lignes il dépasserait le temps de la requête.
+        // Haché une seule fois : bcrypt est volontairement lent (environ 0,2 s), inutile de le répéter pour chaque ligne.
         $password = Hash::make(Str::random(64));
 
         $created = 0;
@@ -43,6 +51,8 @@ readonly class ImportUsersAction
         $skipped = $analysis->skipped;
 
         foreach ($analysis->ready as $row) {
+            $steps = 1;
+
             try {
                 // Une transaction par ligne : un échec n'annule pas les comptes déjà créés
                 $userId = DB::transaction(fn (): int => $this->createMember($row, $groups[$row->voice], $password));
@@ -54,20 +64,28 @@ readonly class ImportUsersAction
                     $photoRows[$userId] = $row;
                 }
             } catch (UniqueConstraintViolationException) {
-                // Compte créé par quelqu'un d'autre entre l'analyse et l'écriture
+                // Compte créé par quelqu'un d'autre entre l'analyse et l'écriture : ni compte ni photo à traiter pour cette ligne
                 $skipped[] = new UserImportIssueDTO($row->line, $row->displayName(), 'Un compte existe déjà avec cet email.');
+                $steps = $row->pictureUrl === null ? 1 : 2;
             }
+
+            $this->imports->advance($import, $steps);
         }
 
-        // Les photos sont téléchargées une fois les comptes créés : un échec ne coûte que la photo
+        // Les photos sont téléchargées une fois les comptes créés : un échec ne coûte que la photo.
+        // Chaque lot est enregistré et compté dès qu'il est fini, pour que le pourcentage avance pendant les téléchargements.
         if ($photoLinks !== []) {
-            foreach (($this->photos)($photoLinks) as $userId => $photo) {
-                if ($photo['url'] !== null) {
-                    $this->profiles->updatePicture($userId, $photo['url']);
-                } else {
-                    $warnings[] = new UserImportIssueDTO($photoRows[$userId]->line, $photoRows[$userId]->displayName(), (string) $photo['warning']);
+            ($this->photos)($photoLinks, function (array $results) use ($import, $photoRows, &$warnings): void {
+                foreach ($results as $userId => $photo) {
+                    if ($photo['url'] !== null) {
+                        $this->profiles->updatePicture($userId, $photo['url']);
+                    } else {
+                        $warnings[] = new UserImportIssueDTO($photoRows[$userId]->line, $photoRows[$userId]->displayName(), (string) $photo['warning']);
+                    }
                 }
-            }
+
+                $this->imports->advance($import, count($results));
+            });
         }
 
         usort($skipped, fn (UserImportIssueDTO $a, UserImportIssueDTO $b): int => $a->line <=> $b->line);
