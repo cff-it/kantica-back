@@ -61,7 +61,8 @@ class MemberProfileRepository
     }
 
     /**
-     * @param  array{adhesion_date: mixed, engagement_date: mixed, engagement_place: string|null}  $attributes
+     * @param  array<string, mixed>  $attributes  colonnes de `user_engagements`, précisions de date comprises
+     *                                            (`adhesion_date_precision`, `engagement_date_precision`)
      */
     public function upsertEngagement(User $user, array $attributes): void
     {
@@ -70,7 +71,7 @@ class MemberProfileRepository
 
     // `user_sacraments` : une ligne par sacrement (baptême, première communion, confirmation, mariage)
     /**
-     * @param  array{date: mixed, place: string|null}  $attributes
+     * @param  array<string, mixed>  $attributes  `date`, `place` et `date_precision` (day par défaut en base)
      */
     public function upsertSacrament(User $user, SacramentType $type, array $attributes): void
     {
@@ -79,11 +80,17 @@ class MemberProfileRepository
 
     // Le mariage garde en plus le conjoint
     /**
-     * @param  array{spouse_name: string|null, spouse_is_member: bool, date: mixed, place: string|null}  $attributes
+     * @param  array<string, mixed>  $attributes  `spouse_name`, `date`, `date_precision` et `place` ; `spouse_is_member`
+     *                                            reste inchangé quand il est absent
      */
     public function upsertMarriage(User $user, array $attributes): void
     {
         UserSacrament::updateOrCreate(['user_id' => $user->id, 'type' => SacramentType::Marriage,], $attributes);
+    }
+
+    public function deleteMarriage(User $user): void
+    {
+        UserSacrament::where('user_id', $user->id)->where('type', SacramentType::Marriage)->delete();
     }
 
     public function updatePicture(int $userId, string $url): void
@@ -99,5 +106,23 @@ class MemberProfileRepository
             'contact_phone' => $phone,
             'relationship'  => $relationship,
         ]);
+    }
+
+    /**
+     * La fiche n'a qu'un bloc « contact en cas d'urgence » : la première ligne est mise à jour (son UUID est conservé),
+     * les éventuelles autres sont supprimées.
+     */
+    public function replaceEmergencyContact(User $user, string $name, ?string $phone, ?string $relationship): void
+    {
+        $contact = UserEmergencyContact::where('user_id', $user->id)->orderBy('id')->first();
+
+        if ($contact === null) {
+            $this->addEmergencyContact($user, $name, $phone, $relationship);
+
+            return;
+        }
+
+        $contact->update(['contact_name' => $name, 'contact_phone' => $phone, 'relationship' => $relationship,]);
+        UserEmergencyContact::where('user_id', $user->id)->where('id', '!=', $contact->id)->delete();
     }
 }

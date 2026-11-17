@@ -39,6 +39,20 @@ class UserRepository
         return User::with(['firstnames', 'profile.voiceGroup', 'profile.voice',])->findOrFail($id);
     }
 
+    // Fiche de recensement complète (écran « Modifier la fiche ») : en plus de findById(), les sacrements, l'engagement
+    // et le contact d'urgence, qui ne sont pas nécessaires ailleurs
+    public function findRecordById(int $id): User
+    {
+        return User::with([
+            'firstnames',
+            'profile.voiceGroup',
+            'profile.voice',
+            'sacraments',
+            'engagement',
+            'emergencyContacts',
+        ])->findOrFail($id);
+    }
+
     public function findByMail(string $mail): ?User
     {
         return User::where('mail', $mail)->first();

@@ -2,11 +2,16 @@
 
 namespace Database\Seeders;
 
+use App\Enums\DatePrecision;
 use App\Enums\RoleName;
+use App\Enums\SacramentType;
 use App\Enums\UserStatus;
 use App\Models\Firstname;
 use App\Models\User;
+use App\Models\UserEmergencyContact;
+use App\Models\UserEngagement;
 use App\Models\UserProfile;
+use App\Models\UserSacrament;
 use App\Models\Voice;
 use App\Models\VoiceGroup;
 use Illuminate\Database\Seeder;
@@ -105,6 +110,53 @@ abstract class MemberScenarioSeeder extends Seeder
         ];
 
         return $user;
+    }
+
+    /**
+     * Complète la fiche d'un compte créé avec un groupe de voix : la fiche de l'écran « Modifier la fiche » (maquette
+     * 11), avec des dates partielles (baptême au mois, première communion à l'année, adhésion au mois) et sans
+     * mariage. Le téléphone du compte est conservé.
+     */
+    protected function fullRecord(User $user): void
+    {
+        UserProfile::where('user_id', $user->id)->update([
+            'birth_date'                 => '1998-03-12',
+            'birth_place'                => 'Antananarivo',
+            'address'                    => 'Lot IVB 12 Faravohitra, Antananarivo',
+            'region_registration_number' => '1234 Faravohitra',
+        ]);
+
+        UserEngagement::create([
+            'user_id'                   => $user->id,
+            'adhesion_date'             => '2019-09-01',
+            'adhesion_date_precision'   => DatePrecision::Month,
+            'engagement_date'           => '2020-12-08',
+            'engagement_date_precision' => DatePrecision::Day,
+            'engagement_place'          => 'Ecar Faravohitra',
+        ]);
+
+        $sacraments = [
+            [SacramentType::Baptism, '1998-05-01', DatePrecision::Month, 'Ecar Faravohitra',],
+            [SacramentType::FirstCommunion, '2008-01-01', DatePrecision::Year, 'Ecar Faravohitra',],
+            [SacramentType::Confirmation, '2012-08-15', DatePrecision::Day, 'Cathédrale Andohalo',],
+        ];
+
+        foreach ($sacraments as [$type, $date, $precision, $place]) {
+            UserSacrament::create([
+                'user_id'        => $user->id,
+                'type'           => $type,
+                'date'           => $date,
+                'date_precision' => $precision,
+                'place'          => $place,
+            ]);
+        }
+
+        UserEmergencyContact::create([
+            'user_id'       => $user->id,
+            'contact_name'  => 'RASOANAIVO Papa, RASOANAIVO Maman',
+            'contact_phone' => '034 00 000 02 / 033 00 000 03',
+            'relationship'  => 'Parents',
+        ]);
     }
 
     // Retire les comptes d'un jeu précédent (les prénoms et les fiches suivent par cascade)
