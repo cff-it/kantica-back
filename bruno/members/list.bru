@@ -40,7 +40,8 @@ docs {
   - `voice` : `S`, `A`, `T` ou `B`
   - `page` : numéro de page, 1 par défaut
   
-  Chaque ligne : `id`, `last_name`, `first_name`, `voice_group`, `voice`, `status` (`pending` = badge « En attente »).
+  Chaque ligne : `id`, `last_name`, `first_name`, `voice_group`, `voice`, `phone`, `contact_mail`, `status` (`pending` = badge « En attente »).
+  `phone` et `contact_mail` (l'email du compte) ont le même format que dans la fiche ; `phone` est `null` sans fiche.
   Les comptes en attente sont listés.
   
   `meta.total` suit la recherche et le filtre. `meta.registered_count` (« 9 choristes recensés ») et
