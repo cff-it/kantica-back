@@ -46,7 +46,7 @@ class ListMembersTest extends TestCase
         );
     }
 
-    public function test_a_row_carries_the_identity_the_voice_and_the_account_status(): void
+    public function test_a_row_carries_the_identity_the_voice_the_contacts_and_the_account_status(): void
     {
         $member = $this->member('Andriamihaja', 'Feno', 'S');
         Sanctum::actingAs($this->secretary);
@@ -54,12 +54,14 @@ class ListMembersTest extends TestCase
         $this->getJson('/api/members')
             ->assertOk()
             ->assertJsonPath('data.0', [
-                'id'          => $member->id,
-                'last_name'   => 'Andriamihaja',
-                'first_name'  => 'Feno',
-                'voice_group' => 'S',
-                'voice'       => null,
-                'status'      => 'active',
+                'id'           => $member->id,
+                'last_name'    => 'Andriamihaja',
+                'first_name'   => 'Feno',
+                'voice_group'  => 'S',
+                'voice'        => null,
+                'phone'        => '034 12 345 67',
+                'contact_mail' => $member->mail,
+                'status'       => 'active',
             ]);
     }
 
@@ -87,7 +89,11 @@ class ListMembersTest extends TestCase
             [$withoutProfile->id, $this->secretary->id, $withoutName->id,],
             $response->json('data.*.id'),
         );
-        $response->assertJsonPath('data.0.voice_group', null)->assertJsonPath('data.0.voice', null);
+        // Sans fiche : ni voix ni téléphone, mais l'email du compte reste disponible comme contact
+        $response->assertJsonPath('data.0.voice_group', null)
+            ->assertJsonPath('data.0.voice', null)
+            ->assertJsonPath('data.0.phone', null)
+            ->assertJsonPath('data.0.contact_mail', $withoutProfile->mail);
     }
 
     public function test_the_registered_count_and_the_voice_counts_cover_all_groups(): void
