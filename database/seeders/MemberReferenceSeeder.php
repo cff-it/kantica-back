@@ -30,7 +30,8 @@ class MemberReferenceSeeder extends MemberScenarioSeeder
 
         // Membres de référence du plan (nom, prénom, voix)
         $this->member('andriamihaja.feno', 'Andriamihaja', 'Feno', 'S', 'S1', phone: '034 20 000 01');
-        $this->member('rasoanaivo.hanta', 'Rasoanaivo', 'Hanta', 'A', 'A2', phone: '034 20 000 02');
+        // V1, V4, M1 : la seule fiche complète (maquette « Modifier la fiche »), avec des dates partielles
+        $this->fullRecord($this->member('rasoanaivo.hanta', 'Rasoanaivo', 'Hanta', 'A', 'A2', phone: '034 20 000 02'));
         $this->member('zafy.lova', 'Zafy', 'Lova', 'T', 'T1', phone: '034 20 000 03');
         $this->member('elysee.noel', 'Élysée', 'Noël', 'S', phone: '034 20 000 04');
         $this->member('rakotoarisoa.hanta', 'Rakotoarisoa', 'Hanta Rasoa', 'A', phone: '034 20 000 05');

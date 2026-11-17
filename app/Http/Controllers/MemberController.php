@@ -39,7 +39,7 @@ class MemberController extends Controller
     // Identifiant brut (pas de route model binding) : le refus 403 de la route passe avant tout 404
     public function show(int $member, UserRepository $users): UserResource
     {
-        return UserResource::make($users->findById($member));
+        return UserResource::make($users->findRecordById($member));
     }
 
     public function update(UpdateMemberProfileRequest $request, int $member, UpdateMemberProfileAction $action): UserResource

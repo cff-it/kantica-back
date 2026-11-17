@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
+use Tests\Feature\Member\Concerns\BuildsMemberRecords;
 use Tests\TestCase;
 
 /**
@@ -20,20 +21,12 @@ use Tests\TestCase;
  */
 class ScenarioDatasetsTest extends TestCase
 {
-    use RefreshDatabase;
+    use BuildsMemberRecords, RefreshDatabase;
 
     // Ordre de la liste avec le jeu de référence : sans casse ni accents, le compte sans nom en dernier (L1, L6)
     private const array REFERENCE_ORDER = [
         'Aaa', 'Andriamihaja', 'Élysée', 'Rakoto', 'Rakotoarisoa', 'Randria', 'Randrianasolo', 'Rasoanaivo',
         'Ratsimba', 'Ravelo', 'Ravoavy', 'Zafy', null,
-    ];
-
-    private const array PAYLOAD = [
-        'last_name'   => 'Razafy',
-        'first_name'  => 'Hantaniaina',
-        'voice_group' => 'B',
-        'voice'       => 'B1',
-        'phone'       => '032 98 765 43',
     ];
 
     public function test_the_reference_dataset_is_sorted_counted_and_exposes_the_statuses(): void
@@ -116,7 +109,15 @@ class ScenarioDatasetsTest extends TestCase
             ->assertJsonPath('data.profile.first_name', 'Hanta')
             ->assertJsonPath('data.profile.voice_group', 'A')
             ->assertJsonPath('data.profile.voice', 'A2')
-            ->assertJsonPath('data.profile.completed', true);
+            ->assertJsonPath('data.profile.completed', true)
+            // V4 : la fiche complète du jeu, dates partielles comprises (adhésion au mois, communion à l'année)
+            ->assertJsonPath('data.profile.birth_date', '1998-03-12')
+            ->assertJsonPath('data.profile.adhesion_date', '2019-09')
+            ->assertJsonPath('data.profile.baptism', ['date' => '1998-05', 'place' => 'Ecar Faravohitra',])
+            ->assertJsonPath('data.profile.first_communion.date', '2008')
+            ->assertJsonPath('data.profile.confirmation.date', '2012-08-15')
+            ->assertJsonPath('data.profile.marriage.spouse', null)
+            ->assertJsonPath('data.profile.emergency_contact.relationships', ['Parents',]);
 
         // V3 : compte en attente sans fiche
         $this->getJson('/api/members/'.$this->id('attente.sans.fiche'))
@@ -127,14 +128,14 @@ class ScenarioDatasetsTest extends TestCase
             ->assertJsonPath('data.profile.phone', null);
 
         // M1 : modification d'un membre actif
-        $this->putJson('/api/members/'.$this->id('rasoanaivo.hanta'), self::PAYLOAD)
+        $this->putJson('/api/members/'.$this->id('rasoanaivo.hanta'), $this->recordPayload())
             ->assertOk()
             ->assertJsonPath('data.profile.voice_group', 'B')
             ->assertJsonPath('data.profile.voice', 'B1')
             ->assertJsonPath('data.firstnames.0.first_name', 'Hantaniaina');
 
         // M4 : fiche créée pour le compte en attente sans fiche, qui reste en attente (M5)
-        $this->putJson('/api/members/'.$this->id('attente.sans.fiche'), self::PAYLOAD)
+        $this->putJson('/api/members/'.$this->id('attente.sans.fiche'), $this->recordPayload())
             ->assertOk()
             ->assertJsonPath('data.status', 'pending')
             ->assertJsonPath('data.profile.completed', true);
@@ -150,7 +151,7 @@ class ScenarioDatasetsTest extends TestCase
         $this->getJson('/api/members')->assertForbidden();
         $this->getJson('/api/members/'.$memberId)->assertForbidden();
         $this->getJson('/api/members/'.$this->id('membre'))->assertForbidden();
-        $this->putJson('/api/members/'.$memberId, self::PAYLOAD)->assertForbidden();
+        $this->putJson('/api/members/'.$memberId, $this->recordPayload())->assertForbidden();
 
         // A5 : une secrétaire en attente de validation est refusée
         $this->signIn('secretaire.attente');
@@ -161,7 +162,7 @@ class ScenarioDatasetsTest extends TestCase
         // V2, M2 : l'admin a les mêmes droits que la secrétaire
         $this->signIn('admin');
         $this->getJson('/api/members/'.$memberId)->assertOk();
-        $this->putJson('/api/members/'.$memberId, self::PAYLOAD)->assertOk();
+        $this->putJson('/api/members/'.$memberId, $this->recordPayload())->assertOk();
     }
 
     public function test_the_counts_dataset_gives_the_figures_of_c1_and_c2(): void

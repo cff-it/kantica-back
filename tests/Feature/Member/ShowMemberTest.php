@@ -2,10 +2,15 @@
 
 namespace Tests\Feature\Member;
 
+use App\Enums\DatePrecision;
 use App\Enums\RoleName;
+use App\Enums\SacramentType;
 use App\Enums\UserStatus;
 use App\Http\Middleware\EnsureAccountIsActive;
 use App\Models\User;
+use App\Models\UserEmergencyContact;
+use App\Models\UserEngagement;
+use App\Models\UserSacrament;
 use App\Models\Voice;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\VoiceSeeder;
@@ -46,8 +51,113 @@ class ShowMemberTest extends TestCase
                 'phone'        => '034 12 345 67',
                 'contact_mail' => 'hanta@exemple.com',
                 'completed'    => true,
+                // Aucun des autres champs de la fiche n'est renseigné : les blocs gardent leur forme, aux champs nuls
+                'birth_date'                 => null,
+                'birth_place'                => null,
+                'address'                    => null,
+                'social_pseudo'              => null,
+                'region_registration_number' => null,
+                'picture_url'                => null,
+                'adhesion_date'              => null,
+                'engagement_date'            => null,
+                'engagement_place'           => null,
+                'baptism'                    => ['date' => null, 'place' => null,],
+                'first_communion'            => ['date' => null, 'place' => null,],
+                'confirmation'               => ['date' => null, 'place' => null,],
+                'marriage'                   => ['spouse' => null, 'date' => null, 'place' => null,],
+                'emergency_contact'          => ['relationships' => [], 'name' => null, 'phone' => null,],
             ])
             ->assertJsonMissingPath('data.password');
+    }
+
+    public function test_a_secretary_reads_the_full_record_with_the_partial_dates_and_the_relationships(): void
+    {
+        $member = $this->member('Rasoanaivo', 'Hanta', 'A');
+        $member->profile->update([
+            'birth_date'                 => '1998-03-12',
+            'birth_place'                => 'Antananarivo',
+            'address'                    => 'Lot IVB 12 Faravohitra',
+            'social_pseudo'              => 'Hanta Rasoa',
+            'region_registration_number' => '1234 Faravohitra',
+            'picture_url'                => 'https://exemple.com/hanta.jpg',
+        ]);
+        UserEngagement::create([
+            'user_id'                   => $member->id,
+            'adhesion_date'             => '2019-09-01',
+            'adhesion_date_precision'   => DatePrecision::Month,
+            'engagement_date'           => '2020-12-08',
+            'engagement_date_precision' => DatePrecision::Day,
+            'engagement_place'          => 'Ecar Faravohitra',
+        ]);
+        UserSacrament::create([
+            'user_id'        => $member->id,
+            'type'           => SacramentType::Baptism,
+            'date'           => '1998-05-01',
+            'date_precision' => DatePrecision::Month,
+            'place'          => 'Ecar Faravohitra',
+        ]);
+        UserSacrament::create([
+            'user_id'        => $member->id,
+            'type'           => SacramentType::FirstCommunion,
+            'date'           => '2008-01-01',
+            'date_precision' => DatePrecision::Year,
+            'place'          => 'Ecar Faravohitra',
+        ]);
+        // Ligne sans précision (importée ou antérieure à la migration) : date complète
+        UserSacrament::create([
+            'user_id' => $member->id,
+            'type'    => SacramentType::Confirmation,
+            'date'    => '2012-08-15',
+            'place'   => 'Cathédrale Andohalo',
+        ]);
+        UserSacrament::create([
+            'user_id'     => $member->id,
+            'type'        => SacramentType::Marriage,
+            'spouse_name' => 'Rabe Jean',
+            'date'        => '2022-06-12',
+            'place'       => 'Ecar Faravohitra',
+        ]);
+        // Liens joints par une virgule, comme l'import les écrit
+        UserEmergencyContact::create([
+            'user_id'       => $member->id,
+            'contact_name'  => 'RASOANAIVO Papa',
+            'contact_phone' => '034 00 000 02',
+            'relationship'  => 'Parents,  Famille ,',
+        ]);
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $this->getJson("/api/members/{$member->id}")
+            ->assertOk()
+            ->assertJsonPath('data.profile.birth_date', '1998-03-12')
+            ->assertJsonPath('data.profile.birth_place', 'Antananarivo')
+            ->assertJsonPath('data.profile.address', 'Lot IVB 12 Faravohitra')
+            ->assertJsonPath('data.profile.social_pseudo', 'Hanta Rasoa')
+            ->assertJsonPath('data.profile.region_registration_number', '1234 Faravohitra')
+            ->assertJsonPath('data.profile.picture_url', 'https://exemple.com/hanta.jpg')
+            ->assertJsonPath('data.profile.adhesion_date', '2019-09')
+            ->assertJsonPath('data.profile.engagement_date', '2020-12-08')
+            ->assertJsonPath('data.profile.engagement_place', 'Ecar Faravohitra')
+            ->assertJsonPath('data.profile.baptism', ['date' => '1998-05', 'place' => 'Ecar Faravohitra',])
+            ->assertJsonPath('data.profile.first_communion', ['date' => '2008', 'place' => 'Ecar Faravohitra',])
+            ->assertJsonPath('data.profile.confirmation', ['date' => '2012-08-15', 'place' => 'Cathédrale Andohalo',])
+            ->assertJsonPath('data.profile.marriage', ['spouse' => 'Rabe Jean', 'date' => '2022-06-12', 'place' => 'Ecar Faravohitra',])
+            ->assertJsonPath('data.profile.emergency_contact', [
+                'relationships' => ['Parents', 'Famille',],
+                'name'          => 'RASOANAIVO Papa',
+                'phone'         => '034 00 000 02',
+            ]);
+    }
+
+    public function test_the_own_profile_keeps_the_short_format(): void
+    {
+        $member = $this->member('Rasoanaivo', 'Hanta', 'A');
+        Sanctum::actingAs($member);
+
+        $this->getJson('/api/me/profile')
+            ->assertOk()
+            ->assertJsonMissingPath('data.birth_date')
+            ->assertJsonMissingPath('data.baptism')
+            ->assertJsonMissingPath('data.emergency_contact');
     }
 
     public function test_an_admin_reads_the_profile_of_a_member(): void
