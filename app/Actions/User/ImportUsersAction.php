@@ -6,6 +6,7 @@ use App\DTOs\User\ImportUsersDTO;
 use App\DTOs\User\UserImportIssueDTO;
 use App\DTOs\User\UserImportRowDTO;
 use App\DTOs\User\UsersImportReportDTO;
+use App\Enums\DatePrecision;
 use App\Enums\RoleName;
 use App\Enums\SacramentType;
 use App\Models\UserImport;
@@ -126,21 +127,28 @@ readonly class ImportUsersAction
 
         if ($row->hasEngagement()) {
             $this->profiles->upsertEngagement($user, [
-                'adhesion_date'    => $row->adhesionDate,
-                'engagement_date'  => $row->engagementDate,
-                'engagement_place' => $row->engagementPlace,
+                'adhesion_date'             => $row->adhesionDate?->date,
+                'adhesion_date_precision'   => $row->adhesionDate?->precision ?? DatePrecision::Day,
+                'engagement_date'           => $row->engagementDate?->date,
+                'engagement_date_precision' => $row->engagementDate?->precision ?? DatePrecision::Day,
+                'engagement_place'          => $row->engagementPlace,
             ]);
         }
 
         foreach ($row->sacraments as $type => $sacrament) {
-            $this->profiles->upsertSacrament($user, SacramentType::from($type), $sacrament);
+            $this->profiles->upsertSacrament($user, SacramentType::from($type), [
+                'date'           => $sacrament['date']?->date,
+                'date_precision' => $sacrament['date']?->precision ?? DatePrecision::Day,
+                'place'          => $sacrament['place'],
+            ]);
         }
 
         if ($row->hasMarriage()) {
             $this->profiles->upsertMarriage($user, [
                 'spouse_name'      => $row->spouseName,
                 'spouse_is_member' => $row->spouseIsMember,
-                'date'             => $row->marriageDate,
+                'date'             => $row->marriageDate?->date,
+                'date_precision'   => $row->marriageDate?->precision ?? DatePrecision::Day,
                 'place'            => $row->marriagePlace,
             ]);
         }

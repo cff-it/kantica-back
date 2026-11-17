@@ -4,8 +4,10 @@ namespace Tests\Unit\User;
 
 use App\Actions\User\ExtractDateAction;
 use App\Actions\User\ExtractDriveFileIdAction;
+use App\Actions\User\ExtractPartialDateAction;
 use App\Actions\User\ParseBirthAction;
 use App\Actions\User\ParseRecensementFieldsAction;
+use App\Enums\DatePrecision;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -123,9 +125,10 @@ class ParseRecensementFieldsActionTest extends TestCase
         ]);
 
         $this->assertSame(['baptism', 'confirmation',], array_keys($result['sacraments']));
-        $this->assertSame('1998-06-05', $result['sacraments']['baptism']['date']->toDateString());
+        $this->assertSame('1998-06-05', $result['sacraments']['baptism']['date']->date->toDateString());
+        $this->assertSame(DatePrecision::Day, $result['sacraments']['baptism']['date']->precision);
         $this->assertSame('Ecar Faravohitra', $result['sacraments']['baptism']['place']);
-        $this->assertSame('2012-08-15', $result['sacraments']['confirmation']['date']->toDateString());
+        $this->assertSame('2012-08-15', $result['sacraments']['confirmation']['date']->date->toDateString());
         $this->assertNull($result['sacraments']['confirmation']['place']);
         $this->assertSame([], $result['warnings']);
     }
@@ -139,16 +142,61 @@ class ParseRecensementFieldsActionTest extends TestCase
         $this->assertSame('Cathédrale Andohalo', $result['sacraments']['first_communion']['place']);
     }
 
-    public function test_a_partial_sacrament_date_is_not_kept_and_is_reported(): void
+    public function test_a_partial_date_is_kept_with_its_precision(): void
     {
-        $result = $this->parse(['baptism_date' => '05/1998', 'first_communion_date' => '2008',]);
+        $result = $this->parse([
+            'baptism_date'         => '05/1998',
+            'first_communion_date' => '2008',
+            'confirmation_date'    => 'Septembre 2019',
+            'adhesion_date'        => '2019',
+            'engagement_date'      => '03/2020',
+            'marriage_date'        => '2021',
+        ]);
+
+        $this->assertSame([], $result['warnings']);
+
+        $baptism = $result['sacraments']['baptism']['date'];
+        $this->assertSame('1998-05-01', $baptism->date->toDateString());
+        $this->assertSame(DatePrecision::Month, $baptism->precision);
+
+        $firstCommunion = $result['sacraments']['first_communion']['date'];
+        $this->assertSame('2008-01-01', $firstCommunion->date->toDateString());
+        $this->assertSame(DatePrecision::Year, $firstCommunion->precision);
+
+        $confirmation = $result['sacraments']['confirmation']['date'];
+        $this->assertSame('2019-09-01', $confirmation->date->toDateString());
+        $this->assertSame(DatePrecision::Month, $confirmation->precision);
+
+        $this->assertSame('2019-01-01', $result['adhesion_date']->date->toDateString());
+        $this->assertSame(DatePrecision::Year, $result['adhesion_date']->precision);
+        $this->assertSame('2020-03-01', $result['engagement_date']->date->toDateString());
+        $this->assertSame(DatePrecision::Month, $result['engagement_date']->precision);
+        $this->assertSame('2021-01-01', $result['marriage_date']->date->toDateString());
+        $this->assertSame(DatePrecision::Year, $result['marriage_date']->precision);
+    }
+
+    public function test_an_unreadable_date_is_not_kept_and_is_reported(): void
+    {
+        $result = $this->parse(['baptism_date' => 'Je ne sais plus', 'first_communion_date' => '31/02/2008',]);
 
         // Sans date lisible ni lieu, aucune ligne `user_sacraments` n'est créée
         $this->assertSame([], $result['sacraments']);
         $this->assertSame([
-            'Date du baptême « 05/1998 » non reconnue (jour, mois et année attendus) : non enregistrée.',
-            'Date de la première communion « 2008 » non reconnue (jour, mois et année attendus) : non enregistrée.',
+            'Date du baptême « Je ne sais plus » non reconnue (jj/mm/aaaa, mm/aaaa ou aaaa attendus) : non enregistrée.',
+            'Date de la première communion « 31/02/2008 » non reconnue (jj/mm/aaaa, mm/aaaa ou aaaa attendus) : non enregistrée.',
         ], $result['warnings']);
+    }
+
+    public function test_the_birth_date_stays_complete_only(): void
+    {
+        $result = $this->parse(['birth' => '05/1998 Tana',]);
+
+        $this->assertNull($result['birth_date']);
+        $this->assertSame('Tana', $result['birth_place']);
+        $this->assertSame(
+            ['Date de naissance « 05/1998 » incomplète (jour, mois et année attendus) : non enregistrée.',],
+            $result['warnings'],
+        );
     }
 
     public function test_no_sacrament_gives_no_row(): void
@@ -191,7 +239,7 @@ class ParseRecensementFieldsActionTest extends TestCase
     {
         $extractDate = new ExtractDateAction();
         $action = new ParseRecensementFieldsAction(
-            $extractDate,
+            new ExtractPartialDateAction($extractDate),
             new ParseBirthAction($extractDate),
             new ExtractDriveFileIdAction(),
         );

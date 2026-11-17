@@ -3,11 +3,14 @@
 namespace App\Actions\User;
 
 use App\Enums\SacramentType;
+use App\Support\PartialDate;
 use Carbon\CarbonImmutable;
 
 // Lit les champs de la fiche de recensement d'une ligne du fichier (adresse, naissance, sacrements, engagement, contact d'urgence,
 // pseudo, photo) et les prépare pour les tables `user_profiles`, `user_engagements`, `user_sacraments` et `user_emergency_contacts`.
 // Une information illisible n'empêche pas l'import de la ligne : elle est signalée dans `warnings` et non enregistrée.
+// Les dates des sacrements, de l'adhésion, de l'engagement et du mariage peuvent n'être connues qu'au mois ou à l'année
+// (« 05/1998 », « 2008 ») : elles sont lues en PartialDate. La naissance reste une date complète (pas de précision en base).
 readonly class ParseRecensementFieldsAction
 {
     private const array DATE_LABELS = [
@@ -27,7 +30,7 @@ readonly class ParseRecensementFieldsAction
     ];
 
     public function __construct(
-        private ExtractDateAction $extractDate,
+        private ExtractPartialDateAction $extractPartialDate,
         private ParseBirthAction $parseBirth,
         private ExtractDriveFileIdAction $extractDriveFileId,
     ) {}
@@ -41,13 +44,13 @@ readonly class ParseRecensementFieldsAction
      *     registration_number: string|null,
      *     picture_url: string|null,
      *     social_pseudo: string|null,
-     *     adhesion_date: CarbonImmutable|null,
-     *     engagement_date: CarbonImmutable|null,
+     *     adhesion_date: PartialDate|null,
+     *     engagement_date: PartialDate|null,
      *     engagement_place: string|null,
-     *     sacraments: array<string, array{date: CarbonImmutable|null, place: string|null}>,
+     *     sacraments: array<string, array{date: PartialDate|null, place: string|null}>,
      *     spouse_name: string|null,
      *     spouse_is_member: bool,
-     *     marriage_date: CarbonImmutable|null,
+     *     marriage_date: PartialDate|null,
      *     marriage_place: string|null,
      *     emergency_name: string|null,
      *     emergency_phone: string|null,
@@ -67,10 +70,10 @@ readonly class ParseRecensementFieldsAction
         $dates = [];
 
         foreach (self::DATE_LABELS as $field => $label) {
-            $dates[$field] = ($this->extractDate)($values[$field])['date'];
+            $dates[$field] = ($this->extractPartialDate)($values[$field]);
 
             if ($values[$field] !== '' && $dates[$field] === null) {
-                $warnings[] = $label.' « '.$values[$field].' » non reconnue (jour, mois et année attendus) : non enregistrée.';
+                $warnings[] = $label.' « '.$values[$field].' » non reconnue (jj/mm/aaaa, mm/aaaa ou aaaa attendus) : non enregistrée.';
             }
         }
 

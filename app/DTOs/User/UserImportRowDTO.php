@@ -2,13 +2,14 @@
 
 namespace App\DTOs\User;
 
+use App\Support\PartialDate;
 use Carbon\CarbonImmutable;
 
 // Ligne valide du fichier : `line` est le numéro de la ligne dans Excel (l'en-tête est la ligne 1)
 class UserImportRowDTO
 {
     /**
-     * @param  array<string, array{date: CarbonImmutable|null, place: string|null}>  $sacraments  baptême, première communion et confirmation renseignés, indexés par valeur de SacramentType
+     * @param  array<string, array{date: PartialDate|null, place: string|null}>  $sacraments  baptême, première communion et confirmation renseignés, indexés par valeur de SacramentType
      * @param  list<string>  $warnings  informations de la ligne qui n'ont pas pu être lues : le compte est créé sans elles
      */
     public function __construct(
@@ -24,13 +25,13 @@ class UserImportRowDTO
         public readonly ?string $registrationNumber = null,
         public readonly ?string $pictureUrl = null,
         public readonly ?string $socialPseudo = null,
-        public readonly ?CarbonImmutable $adhesionDate = null,
-        public readonly ?CarbonImmutable $engagementDate = null,
+        public readonly ?PartialDate $adhesionDate = null,
+        public readonly ?PartialDate $engagementDate = null,
         public readonly ?string $engagementPlace = null,
         public readonly array $sacraments = [],
         public readonly ?string $spouseName = null,
         public readonly bool $spouseIsMember = false,
-        public readonly ?CarbonImmutable $marriageDate = null,
+        public readonly ?PartialDate $marriageDate = null,
         public readonly ?string $marriagePlace = null,
         public readonly ?string $emergencyName = null,
         public readonly ?string $emergencyPhone = null,
