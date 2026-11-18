@@ -1,0 +1,51 @@
+meta {
+  name: import-list
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/users/import
+  body: none
+  auth: bearer
+}
+
+params:query {
+  ~page: 2
+}
+
+auth:bearer {
+  token: {{secretaryToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Historique des imports, du plus récent au plus ancien, 20 par page (`page`). L'admin voit tous les imports ;
+  la secrétaire ne voit que les siens.
+
+  - `data[]` : `id`, `status`, `user` (auteur), `created_at`, `finished_at` (null tant que l'import attend ou tourne),
+    `progress`, `error` et `summary` (`total`, `created`, `skipped_count`, `error_count`, `warning_count`,
+    `null` tant que le rapport n'est pas écrit)
+  - Le rapport complet (lignes ignorées, erreurs, avertissements) se lit avec `users/import-status`
+    (`GET /users/import/{id}`)
+  - `meta` : pagination (`current_page`, `per_page`, `total`...)
+}
+
+tests {
+  test("liste renvoyée", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data).to.be.an("array");
+    expect(res.body.meta.total).to.be.a("number");
+  });
+
+  test("chaque ligne porte l'auteur et l'avancement", function () {
+    res.body.data.forEach((row) => {
+      expect(row.user.last_name).to.be.a("string");
+      expect(row.progress.percent).to.be.within(0, 100);
+      expect(["pending", "running", "completed", "failed"]).to.include(row.status);
+    });
+  });
+}
