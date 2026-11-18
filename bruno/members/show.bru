@@ -1,0 +1,46 @@
+meta {
+  name: show
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/members/{{memberId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{secretaryToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("fiche du membre", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data.id).to.equal(bru.getVar("memberId"));
+    expect(res.body.data.status).to.be.oneOf(["pending", "active"]);
+    expect(res.body.data.profile).to.have.property("last_name");
+    expect(res.body.data.profile).to.have.property("contact_mail");
+    // Fiche complète : les blocs gardent leur forme, aux champs nuls quand ils ne sont pas renseignés
+    expect(res.body.data.profile).to.have.property("birth_date");
+    expect(res.body.data.profile.baptism).to.have.property("date");
+    expect(res.body.data.profile.emergency_contact.relationships).to.be.an("array");
+  });
+}
+
+docs {
+  Fiche complète d'un membre : identité, naissance, coordonnées, voix, adhésion et engagement, sacrements (`baptism`,
+  `first_communion`, `confirmation`), `marriage`, `emergency_contact` et statut du compte (`data.status`, `pending` ou `active`).
+  Les dates sont écrites `1998-03-12`, `1998-05` ou `2008` selon ce qui est connu ; les blocs non renseignés gardent leur forme,
+  aux champs nuls. `picture_url` est en lecture seule.
+  Lancer d'abord `login-secretary` (token `secretaryToken`) et `auth/register` (`memberId`).
+  Le token doit appartenir à un compte actif et vérifié ayant le rôle `secretaire` ou `admin` (403 sinon, même pour sa propre fiche :
+  un membre passe par `me/profile-get`).
+
+  Le bouton « Valider » de la fiche appelle `members/validate`.
+  L'email (`data.profile.contact_mail`) est celui du compte.
+}

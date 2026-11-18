@@ -1,0 +1,51 @@
+meta {
+  name: import-status
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/users/import/{{importId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{secretaryToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Avancement d'un import lancé par `users/import` (`importId`). À relancer jusqu'à `data.status = completed`
+  (ou `failed`). Réservé à celui qui a lancé l'import et à l'admin.
+
+  - `data.status` : `pending` (en attente du worker), `running`, `completed` ou `failed`
+  - `data.progress` : `processed` et `total` comptent des étapes (un compte, une photo), `percent` va de 0 à 100
+    (100 seulement une fois terminé)
+  - `data.file_name` : nom d'origine du fichier (`null` pour un import d'avant son enregistrement)
+  - `data.report` : rapport final (`total`, `created`, `skipped`, `errors`, `warnings`...), `null` avant la fin
+  - `data.report.imported` : membres créés (`line`, `last_name`, `first_name`, `voice`, `mail`), absent des rapports
+    enregistrés avant son ajout
+  - `data.error` : raison de l'arrêt si `failed`. Les membres déjà créés sont conservés : relancer le même fichier
+    crée les autres.
+}
+
+tests {
+  test("avancement renvoyé", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data.progress.percent).to.be.within(0, 100);
+    expect(["pending", "running", "completed", "failed"]).to.include(res.body.data.status);
+  });
+
+  test("rapport présent quand l'import est terminé", function () {
+    if (res.body.data.status === "completed") {
+      expect(res.body.data.progress.percent).to.equal(100);
+      expect(res.body.data.report.total).to.equal(6);
+      expect(res.body.data.report.error_count).to.equal(2);
+      expect(res.body.data.report.created + res.body.data.report.skipped_count).to.equal(4);
+    }
+  });
+}
