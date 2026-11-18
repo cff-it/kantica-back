@@ -44,6 +44,22 @@ class UserImportRowDTO
         return $this->lastName.' '.$this->firstName;
     }
 
+    /**
+     * Ligne telle qu'elle s'affiche sur l'écran de vérification (`ready`) et dans le rapport d'un import (`imported`).
+     *
+     * @return array{line: int, last_name: string, first_name: string, voice: string, mail: string}
+     */
+    public function toReviewArray(): array
+    {
+        return [
+            'line'       => $this->line,
+            'last_name'  => $this->lastName,
+            'first_name' => $this->firstName,
+            'voice'      => $this->voice,
+            'mail'       => $this->mail,
+        ];
+    }
+
     public function hasEngagement(): bool
     {
         return $this->adhesionDate !== null || $this->engagementDate !== null || $this->engagementPlace !== null;

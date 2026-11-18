@@ -25,7 +25,10 @@ docs {
   - `data.status` : `pending` (en attente du worker), `running`, `completed` ou `failed`
   - `data.progress` : `processed` et `total` comptent des étapes (un compte, une photo), `percent` va de 0 à 100
     (100 seulement une fois terminé)
+  - `data.file_name` : nom d'origine du fichier (`null` pour un import d'avant son enregistrement)
   - `data.report` : rapport final (`total`, `created`, `skipped`, `errors`, `warnings`...), `null` avant la fin
+  - `data.report.imported` : membres créés (`line`, `last_name`, `first_name`, `voice`, `mail`), absent des rapports
+    enregistrés avant son ajout
   - `data.error` : raison de l'arrêt si `failed`. Les membres déjà créés sont conservés : relancer le même fichier
     crée les autres.
 }

@@ -27,6 +27,7 @@ docs {
   `users/membres-cff.xlsx` contient 6 lignes : 4 valides, la ligne 5 (voix « Mezzo ») et la ligne 6 (email manquant) à corriger.
   Une ligne dont l'email a déjà un compte est rangée dans `skipped` (le compte n'est pas modifié) : après un import,
   les 4 lignes valides passent donc de `ready` à `skipped`.
+  Chaque ligne de `ready` porte `line`, `last_name`, `first_name`, `voice` et `mail` (en minuscules).
   Le chemin du fichier est relatif à la racine de la collection Bruno.
 }
 

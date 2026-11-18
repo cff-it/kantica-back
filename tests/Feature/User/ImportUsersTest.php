@@ -124,6 +124,7 @@ class ImportUsersTest extends TestCase
                 'last_name'  => 'RAKOTONDRABE',
                 'first_name' => 'Fanja',
                 'voice'      => 'S',
+                'mail'       => 'fanja@example.com',
             ])
             ->assertJsonPath('data.ready.1.voice', 'T')
             ->assertJsonPath('data.errors', [])
@@ -550,7 +551,13 @@ class ImportUsersTest extends TestCase
             ->assertJsonPath('data.total', 3)
             ->assertJsonPath('data.ready_count', 3)
             ->assertJsonPath('data.error_count', 0)
-            ->assertJsonPath('data.ready.0', ['line' => 2, 'last_name' => 'RAKOTO', 'first_name' => 'Exemple', 'voice' => 'T',])
+            ->assertJsonPath('data.ready.0', [
+                'line'       => 2,
+                'last_name'  => 'RAKOTO',
+                'first_name' => 'Exemple',
+                'voice'      => 'T',
+                'mail'       => 'rakoto.exemple@mail.com',
+            ])
             ->assertJsonPath('data.ready.1.voice', 'S')
             ->assertJsonPath('data.ready.2.voice', 'B');
     }
@@ -1379,6 +1386,65 @@ class ImportUsersTest extends TestCase
         $this->assertSame($usersBefore, User::count());
     }
 
+    public function test_the_preview_gives_the_email_of_each_ready_row_in_lowercase(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $this->previewFile([self::HEADER, $this->validRow('Fanja.Rak@Example.COM'),])
+            ->assertOk()
+            ->assertJsonPath('data.ready.0.mail', 'fanja.rak@example.com');
+    }
+
+    public function test_the_report_lists_the_created_members_but_not_the_skipped_nor_the_invalid_rows(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+        User::factory()->create(['mail' => 'deja@example.com',]);
+
+        $this->importFile([
+            self::HEADER,
+            $this->validRow('nouveau@example.com', 'Nouveau'),
+            ['Andria', 'Deja', 'A', '034 00 000 00', 'deja@example.com',],
+            ['Randria', 'Erreur', 'Mezzo', '034 00 000 01', 'erreur@example.com',],
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.created', 1)
+            ->assertJsonPath('data.skipped_count', 1)
+            ->assertJsonPath('data.error_count', 1)
+            ->assertJsonPath('data.imported', [[
+                'line'       => 2,
+                'last_name'  => 'Rakoto',
+                'first_name' => 'Nouveau',
+                'voice'      => 'S',
+                'mail'       => 'nouveau@example.com',
+            ],]);
+    }
+
+    public function test_the_import_remembers_the_original_name_of_the_file(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $response = $this->postJson('/api/users/import', [
+            'file' => $this->xlsx([self::HEADER, $this->validRow(),], 'membres-novembre.xlsx'),
+        ])
+            ->assertStatus(202)
+            ->assertJsonPath('data.file_name', 'membres-novembre.xlsx');
+
+        $this->assertSame('membres-novembre.xlsx', UserImport::findOrFail($response->json('data.id'))->file_name);
+    }
+
+    public function test_a_file_name_longer_than_255_characters_is_truncated(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+        $name = str_repeat('é', 300).'.xlsx';
+
+        $response = $this->postJson('/api/users/import', [
+            'file' => $this->xlsx([self::HEADER, $this->validRow(),], $name),
+        ])->assertStatus(202);
+
+        $this->assertSame(255, mb_strlen($response->json('data.file_name')));
+        $this->assertSame(mb_substr($name, 0, 255), UserImport::findOrFail($response->json('data.id'))->file_name);
+    }
+
     public function test_an_account_created_by_someone_else_during_the_import_is_reported_as_skipped(): void
     {
         Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
@@ -1392,6 +1458,8 @@ class ImportUsersTest extends TestCase
         $this->importFile([self::HEADER, $this->validRow('fanja@example.com'),])
             ->assertOk()
             ->assertJsonPath('data.created', 0)
+            // Pas de compte créé : la ligne ne figure pas parmi les membres importés
+            ->assertJsonPath('data.imported', [])
             ->assertJsonPath('data.skipped.0.line', 2)
             ->assertJsonPath('data.skipped.0.message', 'Un compte existe déjà avec cet email.');
     }
@@ -1863,7 +1931,7 @@ class ImportUsersTest extends TestCase
     /**
      * @param  list<list<mixed>>  $rows
      */
-    private function xlsx(array $rows): UploadedFile
+    private function xlsx(array $rows, string $name = 'membres-cff.xlsx'): UploadedFile
     {
         $path = tempnam(sys_get_temp_dir(), 'import');
         $writer = new Writer();
@@ -1875,7 +1943,7 @@ class ImportUsersTest extends TestCase
 
         $writer->close();
 
-        return UploadedFile::fake()->createWithContent('membres-cff.xlsx', (string) file_get_contents($path));
+        return UploadedFile::fake()->createWithContent($name, (string) file_get_contents($path));
     }
 
     /**

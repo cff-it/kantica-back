@@ -45,6 +45,8 @@ class ImportUsersRequest extends FormRequest
         return new StartUsersImportDTO(
             path: $this->file('file')->getRealPath(),
             userId: $this->user()->id,
+            // Nom donné par le client : affiché dans l'historique, jamais utilisé comme chemin ; coupé à la taille de la colonne
+            fileName: mb_substr($this->file('file')->getClientOriginalName(), 0, 255),
         );
     }
 }

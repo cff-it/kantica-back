@@ -17,6 +17,8 @@ class UserImportResource extends JsonResource
         return [
             'id'     => $this->id,
             'status' => $this->status->value,
+            // Nom d'origine du fichier ; null pour les imports d'avant son enregistrement
+            'file_name' => $this->file_name,
             // Qui a lancé l'import
             'user' => [
                 'id'         => $this->user->id,

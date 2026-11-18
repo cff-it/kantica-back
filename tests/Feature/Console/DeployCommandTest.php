@@ -98,6 +98,8 @@ class DeployCommandTest extends TestCase
 
         $this->assertTrue($admin->hasRole(RoleName::Admin->value));
         $this->assertSame(UserStatus::Active, $admin->status);
+        $this->assertSame('Chorale Francophone de Faravohitra', $admin->last_name);
+        $this->assertSame('CFF', $admin->nick_name);
         $this->assertTrue($admin->hasVerifiedEmail());
         $this->assertTrue(Hash::check(self::ADMIN_PASSWORD, $admin->password));
     }
@@ -106,13 +108,14 @@ class DeployCommandTest extends TestCase
     {
         $this->artisan('app:deploy', ['--skip-migrate' => true,])->assertSuccessful();
         $admin = User::where('mail', self::ADMIN_MAIL)->firstOrFail();
-        $admin->update(['password' => 'Changé123!',]);
+        $admin->update(['password' => 'Changé123!', 'nick_name' => 'Renommé',]);
 
         config(['kantica.super_admin.password' => 'Autre456!',]);
         $this->artisan('app:deploy', ['--skip-migrate' => true,])->assertSuccessful();
 
         $this->assertSame(1, User::role(RoleName::Admin->value)->count());
         $this->assertTrue(Hash::check('Changé123!', $admin->refresh()->password));
+        $this->assertSame('Renommé', $admin->nick_name);
     }
 
     public function test_no_variable_is_needed_once_an_admin_exists(): void

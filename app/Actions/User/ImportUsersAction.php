@@ -46,6 +46,8 @@ readonly class ImportUsersAction
         $password = Hash::make(Str::random(64));
 
         $created = 0;
+        // Lignes réellement créées : jamais celles tombées dans la violation d'unicité ci-dessous
+        $imported = [];
         $warnings = [];
         $photoLinks = [];
         $photoRows = [];
@@ -58,6 +60,7 @@ readonly class ImportUsersAction
                 // Une transaction par ligne : un échec n'annule pas les comptes déjà créés
                 $userId = DB::transaction(fn (): int => $this->createMember($row, $groups[$row->voice], $password));
                 $created++;
+                $imported[] = $row;
                 $warnings = [...$warnings, ...$row->warningIssues(),];
 
                 if ($row->pictureUrl !== null) {
@@ -99,6 +102,7 @@ readonly class ImportUsersAction
             errors: $analysis->errors,
             warnings: $warnings,
             ignoredColumns: $analysis->ignoredColumns,
+            imported: $imported,
         );
     }
 

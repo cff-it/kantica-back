@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $user_id
  * @property UserImportStatus $status
  * @property string|null $file_path
+ * @property string|null $file_name
  * @property int $total
  * @property int $processed
  * @property array<string, mixed>|null $report
@@ -26,7 +27,7 @@ class UserImport extends Model
 
     public const string FILE_DIRECTORY = 'imports';
 
-    protected $fillable = ['user_id', 'status', 'file_path', 'total', 'processed', 'report', 'error_message',];
+    protected $fillable = ['user_id', 'status', 'file_path', 'file_name', 'total', 'processed', 'report', 'error_message',];
 
     protected function casts(): array
     {

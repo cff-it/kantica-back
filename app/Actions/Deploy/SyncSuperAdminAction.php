@@ -12,6 +12,11 @@ use RuntimeException;
 
 readonly class SyncSuperAdminAction
 {
+    // Identité du compte originel : c'est le compte de la chorale elle-même, pas celui d'un choriste
+    private const string LAST_NAME = 'Chorale Francophone de Faravohitra';
+
+    private const string NICK_NAME = 'CFF';
+
     public function __construct(
         private UserRepository $users,
     ) {}
@@ -55,9 +60,11 @@ readonly class SyncSuperAdminAction
 
         DB::transaction(function () use ($mail, $password): void {
             $user = $this->users->create([
-                'mail'     => $mail,
-                'password' => $password,
-                'status'   => UserStatus::Active,
+                'mail'      => $mail,
+                'last_name' => self::LAST_NAME,
+                'nick_name' => self::NICK_NAME,
+                'password'  => $password,
+                'status'    => UserStatus::Active,
             ]);
 
             $user->markEmailAsVerified();

@@ -75,6 +75,7 @@ class ListUsersImportsTest extends TestCase
             ->assertJsonPath('data.0', [
                 'id'          => $import->id,
                 'status'      => 'completed',
+                'file_name'   => 'membres-cff.xlsx',
                 'user'        => ['id' => $this->secretary->id, 'last_name' => 'Rakoto', 'first_name' => 'Fanja',],
                 'created_at'  => $createdAt->toIso8601String(),
                 'finished_at' => $finishedAt->toIso8601String(),
@@ -90,6 +91,16 @@ class ListUsersImportsTest extends TestCase
             ])
             // Les lignes du rapport (noms des membres) restent dans le détail
             ->assertJsonMissingPath('data.0.report');
+    }
+
+    public function test_the_file_name_is_null_for_an_import_recorded_without_one(): void
+    {
+        $this->importOf($this->secretary, fileName: null);
+        Sanctum::actingAs($this->secretary);
+
+        $this->getJson('/api/users/import')
+            ->assertOk()
+            ->assertJsonPath('data.0.file_name', null);
     }
 
     public function test_a_running_import_has_its_percent_and_no_finish_date_nor_summary(): void
@@ -244,6 +255,7 @@ class ListUsersImportsTest extends TestCase
         $this->getJson('/api/users/import/'.$import->id)
             ->assertOk()
             ->assertJsonPath('data.id', $import->id)
+            ->assertJsonPath('data.file_name', 'membres-cff.xlsx')
             ->assertJsonPath('data.user', ['id' => $this->secretary->id, 'last_name' => 'Rakoto', 'first_name' => 'Fanja',])
             ->assertJsonPath('data.created_at', $createdAt->toIso8601String())
             ->assertJsonPath('data.finished_at', $finishedAt->toIso8601String())
@@ -291,12 +303,14 @@ class ListUsersImportsTest extends TestCase
         int $processed = 0,
         ?array $report = null,
         ?string $error = null,
+        ?string $fileName = 'membres-cff.xlsx',
         ?CarbonImmutable $createdAt = null,
         ?CarbonImmutable $updatedAt = null,
     ): UserImport {
         $import = UserImport::create([
             'user_id'       => $owner->id,
             'status'        => $status,
+            'file_name'     => $fileName,
             'total'         => $total,
             'processed'     => $processed,
             'report'        => $report,
