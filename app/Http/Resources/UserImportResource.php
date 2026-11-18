@@ -15,8 +15,17 @@ class UserImportResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'       => $this->id,
-            'status'   => $this->status->value,
+            'id'     => $this->id,
+            'status' => $this->status->value,
+            // Qui a lancé l'import
+            'user' => [
+                'id'         => $this->user->id,
+                'last_name'  => $this->user->last_name,
+                'first_name' => $this->user->firstnames->isEmpty() ? null : $this->user->firstnames->pluck('first_name')->implode(' '),
+            ],
+            'created_at'  => $this->created_at->toIso8601String(),
+            // Fin du traitement (terminé ou échoué) ; null tant que l'import attend ou tourne
+            'finished_at' => $this->finishedAt(),
             // `processed` et `total` comptent des étapes (un compte, une photo), pas des lignes du fichier
             'progress' => [
                 'processed' => $this->processed,
@@ -28,6 +37,13 @@ class UserImportResource extends JsonResource
             // Raison de l'arrêt quand le statut est `failed`
             'error' => $this->error_message,
         ];
+    }
+
+    private function finishedAt(): ?string
+    {
+        $finished = in_array($this->status, [UserImportStatus::Completed, UserImportStatus::Failed,], true);
+
+        return $finished ? $this->updated_at->toIso8601String() : null;
     }
 
     // 100 seulement une fois l'import terminé : tant que le rapport n'est pas écrit, on ne dépasse pas 99
