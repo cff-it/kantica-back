@@ -4,6 +4,7 @@ namespace Tests\Feature\User;
 
 use App\Actions\User\AnalyzeUsersImportAction;
 use App\Actions\User\RunUsersImportAction;
+use App\Enums\DatePrecision;
 use App\Enums\RoleName;
 use App\Enums\UserImportStatus;
 use App\Enums\UserStatus;
@@ -660,9 +661,9 @@ class ImportUsersTest extends TestCase
                 'name'    => 'RAKOTO Exemple',
                 'message' => 'Date de naissance « 1995 » incomplète (jour, mois et année attendus) : non enregistrée.',
             ])
-            ->assertJsonPath('data.warnings.1.message', "Date d'adhésion « Septembre 2019 » non reconnue (jour, mois et année attendus) : non enregistrée.")
-            ->assertJsonPath('data.warnings.2.message', "Date d'engagement « Je ne sais plus » non reconnue (jour, mois et année attendus) : non enregistrée.")
-            ->assertJsonPath('data.warnings.3.message', 'Date du mariage « 31/02/2020 » non reconnue (jour, mois et année attendus) : non enregistrée.')
+            ->assertJsonPath('data.warnings.1.message', "Date d'adhésion « 13/2019 » non reconnue (jj/mm/aaaa, mm/aaaa ou aaaa attendus) : non enregistrée.")
+            ->assertJsonPath('data.warnings.2.message', "Date d'engagement « Je ne sais plus » non reconnue (jj/mm/aaaa, mm/aaaa ou aaaa attendus) : non enregistrée.")
+            ->assertJsonPath('data.warnings.3.message', 'Date du mariage « 31/02/2020 » non reconnue (jj/mm/aaaa, mm/aaaa ou aaaa attendus) : non enregistrée.')
             ->assertJsonPath('data.warnings.4.message', 'Photo « pas de photo » : seuls les liens Google Drive sont repris, non enregistrée.')
             ->assertJsonPath('data.warnings.5.message', "Numéro du contact d'urgence sans nom : non enregistré.");
     }
@@ -908,6 +909,93 @@ class ImportUsersTest extends TestCase
         $this->assertSame('034 00 000 02 / 033 00 000 03', $contact->contact_phone);
         $this->assertSame('Parents', $contact->relationship);
         $this->assertNotEmpty($contact->uuid);
+    }
+
+    public function test_complete_dates_are_saved_with_the_day_precision(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $this->importFile([
+            self::FORM_HEADER,
+            $this->formRow('RAKOTO Exemple', 'rakoto@example.com', '034 00 000 01', 'Ténor', [
+                "Date d'adhésion à la chorale" => '03/09/2019',
+                'Marié(e) à...'                => 'RASOA Exemple',
+                'Date du Mariage'              => '20/07/2021',
+            ]),
+        ])->assertOk()->assertJsonPath('data.warning_count', 0);
+
+        $user = User::where('mail', 'rakoto@example.com')->firstOrFail();
+        $sacraments = $user->sacraments->keyBy(fn (UserSacrament $sacrament): string => $sacrament->type->value);
+
+        $this->assertSame(DatePrecision::Day, $user->engagement->adhesion_date_precision);
+        $this->assertSame(DatePrecision::Day, $user->engagement->engagement_date_precision);
+        $this->assertSame(DatePrecision::Day, $sacraments['baptism']->date_precision);
+        $this->assertSame(DatePrecision::Day, $sacraments['first_communion']->date_precision);
+        $this->assertSame(DatePrecision::Day, $sacraments['confirmation']->date_precision);
+        $this->assertSame(DatePrecision::Day, $sacraments['marriage']->date_precision);
+    }
+
+    public function test_partial_dates_are_saved_with_their_precision(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $this->importFile([
+            self::FORM_HEADER,
+            $this->formRow('RAKOTO Exemple', 'rakoto@example.com', '034 00 000 01', 'Ténor', [
+                'Date du Baptême'              => '05/1998',
+                'Date de la Première Communion' => '2008',
+                "Date d'adhésion à la chorale" => 'Septembre 2019',
+                "Date d'engagement"            => '2020',
+                'Marié(e) à...'                => 'RASOA Exemple',
+                'Date du Mariage'              => '07/2021',
+            ]),
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.created', 1)
+            ->assertJsonPath('data.warning_count', 0)
+            ->assertJsonPath('data.warnings', []);
+
+        $user = User::where('mail', 'rakoto@example.com')->firstOrFail();
+
+        // La date garde le premier jour de la période ; la précision dit ce qui est connu
+        $this->assertSame('2019-09-01', $user->engagement->adhesion_date->toDateString());
+        $this->assertSame(DatePrecision::Month, $user->engagement->adhesion_date_precision);
+        $this->assertSame('2020-01-01', $user->engagement->engagement_date->toDateString());
+        $this->assertSame(DatePrecision::Year, $user->engagement->engagement_date_precision);
+
+        $sacraments = $user->sacraments->keyBy(fn (UserSacrament $sacrament): string => $sacrament->type->value);
+
+        $this->assertSame('1998-05-01', $sacraments['baptism']->date->toDateString());
+        $this->assertSame(DatePrecision::Month, $sacraments['baptism']->date_precision);
+        $this->assertSame('Ecar Faravohitra', $sacraments['baptism']->place);
+        $this->assertSame('2008-01-01', $sacraments['first_communion']->date->toDateString());
+        $this->assertSame(DatePrecision::Year, $sacraments['first_communion']->date_precision);
+        // Une date complète du même fichier garde la précision au jour
+        $this->assertSame('2012-08-15', $sacraments['confirmation']->date->toDateString());
+        $this->assertSame(DatePrecision::Day, $sacraments['confirmation']->date_precision);
+        $this->assertSame('2021-07-01', $sacraments['marriage']->date->toDateString());
+        $this->assertSame(DatePrecision::Month, $sacraments['marriage']->date_precision);
+    }
+
+    public function test_a_partial_birth_date_is_still_not_saved_and_is_reported(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $this->importFile([
+            self::FORM_HEADER,
+            $this->formRow('RAKOTO Exemple', 'rakoto@example.com', '034 00 000 01', 'Ténor', [
+                'Date et Lieu de naissance' => '05/1998, Fianarantsoa',
+            ]),
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.created', 1)
+            ->assertJsonPath('data.warning_count', 1)
+            ->assertJsonPath('data.warnings.0.message', 'Date de naissance « 05/1998 » incomplète (jour, mois et année attendus) : non enregistrée.');
+
+        $profile = User::where('mail', 'rakoto@example.com')->firstOrFail()->profile;
+
+        $this->assertNull($profile->birth_date);
+        $this->assertSame('Fianarantsoa', $profile->birth_place);
     }
 
     public function test_a_row_with_unreadable_information_is_created_without_it_and_reported(): void
@@ -1722,7 +1810,7 @@ class ImportUsersTest extends TestCase
     {
         return [
             'Date et Lieu de naissance'                                  => '1995, Fianarantsoa',
-            "Date d'adhésion à la chorale"                               => 'Septembre 2019',
+            "Date d'adhésion à la chorale"                               => '13/2019',
             "Date d'engagement"                                          => 'Je ne sais plus',
             'Date du Mariage'                                            => '31/02/2020',
             "Photo d'identité récente"                                   => 'pas de photo',
