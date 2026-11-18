@@ -32,7 +32,7 @@ readonly class StartUsersImportAction
             Str::random(40).'.xlsx',
         ) ?: throw new RuntimeException("Le fichier d'import n'a pas pu être enregistré.");
 
-        $import = $this->imports->create($dto->userId, $path, $analysis->steps());
+        $import = $this->imports->create($dto->userId, $path, $analysis->steps(), $dto->fileName);
 
         ImportUsersJob::dispatch($import->id);
 

@@ -9,12 +9,13 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 class UserImportRepository
 {
-    public function create(int $userId, string $filePath, int $total): UserImport
+    public function create(int $userId, string $filePath, int $total, string $fileName): UserImport
     {
         return UserImport::create([
             'user_id'   => $userId,
             'status'    => UserImportStatus::Pending,
             'file_path' => $filePath,
+            'file_name' => $fileName,
             'total'     => $total,
         ]);
     }

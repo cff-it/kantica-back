@@ -20,7 +20,7 @@ class UserImportListItemResource extends JsonResource
         $detail = UserImportResource::make($this->resource)->resolve($request);
 
         return [
-            ...Arr::only($detail, ['id', 'status', 'progress', 'user', 'created_at', 'finished_at', 'error',]),
+            ...Arr::only($detail, ['id', 'status', 'file_name', 'progress', 'user', 'created_at', 'finished_at', 'error',]),
             'summary' => $this->summary(),
         ];
     }

@@ -21,12 +21,7 @@ class UsersImportPreviewResource extends JsonResource
             'skipped_count' => count($this->skipped),
             'error_count'   => count($this->errors),
             'warning_count' => count($this->warnings),
-            'ready'         => array_map(fn (UserImportRowDTO $row): array => [
-                'line'       => $row->line,
-                'last_name'  => $row->lastName,
-                'first_name' => $row->firstName,
-                'voice'      => $row->voice,
-            ], $this->ready),
+            'ready'           => array_map(fn (UserImportRowDTO $row): array => $row->toReviewArray(), $this->ready),
             'skipped'         => array_map($this->issue(...), $this->skipped),
             'errors'          => array_map($this->issue(...), $this->errors),
             'warnings'        => array_map($this->issue(...), $this->warnings),
