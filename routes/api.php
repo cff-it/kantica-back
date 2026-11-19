@@ -51,6 +51,9 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
     // whereNumber : `/members/export` (KAN-30) ne doit jamais être pris pour un identifiant
     Route::get('/members', [MemberController::class, 'index'])
         ->can('viewAny', UserProfile::class);
+    // Ajout d'un membre (KAN-89) : compte actif créé par la secrétaire ou l'admin, qui reçoit un mail d'invitation
+    Route::post('/members', [MemberController::class, 'store'])
+        ->can('create', UserProfile::class);
     Route::get('/members/{member}', [MemberController::class, 'show'])
         ->whereNumber('member')
         ->can('view', UserProfile::class);

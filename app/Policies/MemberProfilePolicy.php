@@ -23,6 +23,11 @@ class MemberProfilePolicy
         return $this->manages($user);
     }
 
+    public function create(User $user): bool
+    {
+        return $this->manages($user);
+    }
+
     public function update(User $user): bool
     {
         return $this->manages($user);
