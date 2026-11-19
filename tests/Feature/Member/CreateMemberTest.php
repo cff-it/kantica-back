@@ -266,6 +266,7 @@ class CreateMemberTest extends TestCase
         $mail->assertSeeInHtml('Hantaniaina');
         $mail->assertSeeInHtml(self::MAIL);
         $mail->assertSeeInHtml($mail->password);
+        $mail->assertSeeInHtml('changer votre mot de passe');
     }
 
     public function test_the_invitation_is_encrypted_in_the_queue_so_the_password_is_never_stored_in_clear(): void
