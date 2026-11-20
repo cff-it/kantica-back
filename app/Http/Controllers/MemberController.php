@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Member\CreateMemberAction;
 use App\Actions\Member\ExportMembersAction;
 use App\Actions\Member\ListMembersAction;
 use App\Actions\Member\UpdateMemberProfileAction;
 use App\Actions\User\ValidateMemberAction;
+use App\Http\Requests\Member\CreateMemberRequest;
 use App\Http\Requests\Member\ExportMembersRequest;
 use App\Http\Requests\Member\ListMembersRequest;
 use App\Http\Requests\Member\UpdateMemberProfileRequest;
@@ -13,6 +15,7 @@ use App\Http\Resources\MemberListItemResource;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Repositories\UserRepository;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -34,6 +37,11 @@ class MemberController extends Controller
                 'voice_counts'     => $list->voiceCounts,
             ],
         ]);
+    }
+
+    public function store(CreateMemberRequest $request, CreateMemberAction $action): JsonResponse
+    {
+        return UserResource::make($action($request->toDTO()))->response()->setStatusCode(Response::HTTP_CREATED);
     }
 
     // Identifiant brut (pas de route model binding) : le refus 403 de la route passe avant tout 404
