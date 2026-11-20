@@ -1,0 +1,99 @@
+meta {
+  name: create
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/members
+  body: json
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+}
+
+body:json {
+  {
+    "mail": "{{$randomEmail}}",
+    "last_name": "Rasoanaivo",
+    "first_name": "Hanta",
+    "voice_group": "A",
+    "voice": "A2",
+    "phone": "034 12 345 67",
+    "birth_date": "12/03/1998",
+    "birth_place": "Antananarivo",
+    "address": "Lot IVB 12 Faravohitra, Antananarivo",
+    "social_pseudo": null,
+    "region_registration_number": "1234 Faravohitra",
+    "adhesion_date": "Septembre 2019",
+    "engagement_date": "08/12/2020",
+    "engagement_place": "Ecar Faravohitra",
+    "baptism": {"date": "05/1998", "place": "Ecar Faravohitra"},
+    "first_communion": {"date": "2008", "place": "Ecar Faravohitra"},
+    "confirmation": {"date": "15/08/2012", "place": "Cathédrale Andohalo"},
+    "marriage": {"spouse": null, "date": null, "place": null},
+    "emergency_contact": {
+      "relationships": ["Parents"],
+      "name": "RASOANAIVO Papa, RASOANAIVO Maman",
+      "phone": "034 00 000 02 / 033 00 000 03"
+    }
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar("createdMemberId", res.body.data.id);
+  }
+}
+
+tests {
+  test("membre créé avec sa fiche complète", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.data.status).to.equal("active");
+    expect(res.body.data.email_verified).to.equal(true);
+    expect(res.body.data.profile.completed).to.equal(true);
+    expect(res.body.data.profile.last_name).to.equal("Rasoanaivo");
+    expect(res.body.data.profile.first_name).to.equal("Hanta");
+    expect(res.body.data.profile.voice_group).to.equal("A");
+    expect(res.body.data.profile.voice).to.equal("A2");
+    expect(res.body.data.profile.phone).to.equal("034 12 345 67");
+    // Les dates sont écrites selon ce qui est connu : jour, mois ou année seulement
+    expect(res.body.data.profile.birth_date).to.equal("1998-03-12");
+    expect(res.body.data.profile.adhesion_date).to.equal("2019-09");
+    expect(res.body.data.profile.baptism.date).to.equal("1998-05");
+    expect(res.body.data.profile.first_communion.date).to.equal("2008");
+    expect(res.body.data.profile.confirmation.date).to.equal("2012-08-15");
+    expect(res.body.data.profile.emergency_contact.relationships).to.deep.equal(["Parents"]);
+    // Le mot de passe n'est jamais renvoyé : il part uniquement dans le mail d'invitation
+    expect(res.body.data).to.not.have.property("password");
+  });
+}
+
+docs {
+  Ajoute un membre avec sa fiche complète : crée son compte (directement actif et vérifié, rôle `membre`) et toute sa fiche de
+  recensement, puis lui envoie un mail d'invitation. Lancer d'abord `login-secretary` (token `secretaryToken`). Le token doit
+  appartenir à un compte actif et vérifié ayant le rôle `secretaire` ou `admin` (403 sinon, même avant la validation du payload).
+
+  Mêmes champs et mêmes validations que `members/update`, plus `mail` (obligatoire).
+  Obligatoires : `mail`, `last_name`, `first_name`, `voice_group` (S, A, T ou B), `phone`, `birth_date` (jj/mm/aaaa), `birth_place`,
+  `address`, `adhesion_date`, `baptism`, `first_communion`, `confirmation` (chacun `{date, place}`) et `emergency_contact`
+  (`{relationships[], name, phone}`).
+  Facultatifs : `voice` (S1, A2..., doit appartenir au groupe), `social_pseudo`, `region_registration_number`, `engagement_date`,
+  `engagement_place` et `marriage` (`{spouse, date, place}` ; un bloc sans conjoint, date ni lieu ne crée pas de mariage).
+
+  Dates : jour, mois ou année seulement (`12/03/1998`, `05/1998`, `Septembre 2019`, `2008`, ou `1998-03-12`, `1998-05`), jamais
+  dans le futur ; la date de naissance est complète.
+
+  `mail` : écrit en minuscules, unique sans tenir compte de la casse (422 `mail` si un compte existe déjà). Il ne sera plus modifiable.
+  `first_name` : chaque mot est un prénom à part entière (`Hanta Rasoa` donne deux prénoms, le premier par défaut).
+  Le statut, les rôles, le mot de passe et la photo ne se choisissent pas ici : tout champ `status`, `roles`, `password` ou
+  `picture_url` envoyé est ignoré.
+
+  Le mot de passe est généré (16 caractères), stocké haché et envoyé uniquement dans le mail d'invitation (adresse et mot de
+  passe, sans lien : la réinitialisation du mot de passe n'existe pas encore). En local (`MAIL_MAILER=log`), le mail est dans
+  `storage/logs/laravel.log` ; il part via la file d'attente (`php artisan queue:work`, sans effet avec `QUEUE_CONNECTION=sync`).
+
+  La réponse est identique à `members/show` ; l'identifiant du membre créé est gardé dans `createdMemberId`.
+}

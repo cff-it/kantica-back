@@ -115,4 +115,17 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Interception des mails (hors production)
+    |--------------------------------------------------------------------------
+    |
+    | Quand cette adresse est renseignée, tous les mails (Mailable et
+    | Notification) sont redirigés vers elle, quel que soit leur destinataire
+    | d'origine. Ignoré en production (voir AppServiceProvider).
+    |
+    */
+
+    'always_to' => env('MAIL_ALWAYS_TO'),
+
 ];
