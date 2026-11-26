@@ -31,6 +31,12 @@ class UserRepository
             ->get();
     }
 
+    // Compte seul, sans relation : pour vérifier qu'il existe (404 sinon) avant une écriture ciblée
+    public function findPlainById(int $id): User
+    {
+        return User::findOrFail($id);
+    }
+
     public function findById(int $id): User
     {
         return User::with(['firstnames', 'profile.voiceGroup', 'profile.voice',])->findOrFail($id);

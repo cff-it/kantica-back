@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Member\AssignVoiceAction;
 use App\Actions\Member\CreateMemberAction;
 use App\Actions\Member\ExportMembersAction;
 use App\Actions\Member\ListMembersAction;
 use App\Actions\Member\UpdateMemberProfileAction;
 use App\Actions\User\ValidateMemberAction;
+use App\Http\Requests\Member\AssignVoiceRequest;
 use App\Http\Requests\Member\CreateMemberRequest;
 use App\Http\Requests\Member\ExportMembersRequest;
 use App\Http\Requests\Member\ListMembersRequest;
@@ -53,6 +55,12 @@ class MemberController extends Controller
     public function update(UpdateMemberProfileRequest $request, int $member, UpdateMemberProfileAction $action): UserResource
     {
         return UserResource::make($action($member, $request->toDTO()));
+    }
+
+    // Identifiant brut, comme update() : le refus 403 de la route passe avant tout 404
+    public function assignVoice(AssignVoiceRequest $request, AssignVoiceAction $action): UserResource
+    {
+        return UserResource::make($action($request->toDTO()));
     }
 
     public function validateAccount(User $member, ValidateMemberAction $action): UserResource

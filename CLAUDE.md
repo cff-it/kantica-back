@@ -182,7 +182,7 @@ public function toDTO(): CheckInDTO
 |---|---|
 | **Répertoire chants** | `CreateSong`, `UpdateSong`, `AttachSongToMass` |
 | **Liturgie messes** | `CreateMass`, `AssignSongToMassPart`, `GeneratePptx` |
-| **Membres & rôles** | `CreateUser`, `AssignRole`, `AssignMassRole` |
+| **Membres & rôles** | `CreateUser`, `AssignRole`, `AssignMassRole`, `AssignVoiceAction` (`PUT /api/members/{member}/voice`, KAN-34 : voix seule, 422 sans fiche, voix précise effacée si le groupe change) |
 | **Événements** | `CreateEvent`, `RegisterMember`, `CheckInMember` |
 | **Paiements** | `CreateEventPayment`, `RecordUserPayment` |
 
