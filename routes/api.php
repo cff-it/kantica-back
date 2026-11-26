@@ -60,6 +60,10 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
     Route::put('/members/{member}', [MemberController::class, 'update'])
         ->whereNumber('member')
         ->can('update', UserProfile::class);
+    // Attribution de la voix seule (KAN-34, US-10) : la fiche complète n'est pas demandée
+    Route::put('/members/{member}/voice', [MemberController::class, 'assignVoice'])
+        ->whereNumber('member')
+        ->can('update', UserProfile::class);
 
     // ── Validation des membres ──────────────────────────────────────────
     Route::post('/members/{member}/validate', [MemberController::class, 'validateAccount'])

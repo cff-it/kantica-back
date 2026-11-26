@@ -60,6 +60,15 @@ class MemberProfileRepository
         UserProfile::updateOrCreate(['user_id' => $user->id,], $attributes);
     }
 
+    // Groupe de voix et voix précise d'une fiche existante, sans toucher aux autres champs
+    public function updateVoice(UserProfile $profile, int $voiceGroupId, ?int $voiceId): void
+    {
+        $profile->update([
+            'voice_group_id' => $voiceGroupId,
+            'voice_id'       => $voiceId,
+        ]);
+    }
+
     /**
      * @param  array<string, mixed>  $attributes  colonnes de `user_engagements`, précisions de date comprises
      *                                            (`adhesion_date_precision`, `engagement_date_precision`)
