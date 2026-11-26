@@ -893,9 +893,12 @@ class ImportUsersTest extends TestCase
 
         $this->assertSame('Pseudo Exemple', $profile->social_pseudo);
 
-        // Une ligne par sacrement
+        // Une ligne par sacrement. La relation n'est pas triée : PostgreSQL ne garantit pas l'ordre des lignes
         $sacraments = $user->sacraments->keyBy(fn (UserSacrament $sacrament): string => $sacrament->type->value);
-        $this->assertSame(['baptism', 'first_communion', 'confirmation', 'marriage',], $sacraments->keys()->all());
+        $this->assertEqualsCanonicalizing(
+            ['baptism', 'first_communion', 'confirmation', 'marriage',],
+            $sacraments->keys()->all(),
+        );
 
         $this->assertSame('1998-06-05', $sacraments['baptism']->date->toDateString());
         $this->assertSame('Ecar Faravohitra', $sacraments['baptism']->place);

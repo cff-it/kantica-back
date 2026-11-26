@@ -18,6 +18,9 @@ readonly class AssignRoleAction
     public function __invoke(AssignRoleDTO $dto): User
     {
         return DB::transaction(function () use ($dto): User {
+            // Verrou d'abord, lecture ensuite : deux changements de rôle simultanés (sur le même compte, ou deux admins
+            // qui se retirent le rôle) passent l'un après l'autre et chacun lit des rôles à jour
+            $this->users->lockRoleChanges();
             $user = $this->users->findWithRolesById($dto->userId);
 
             if ($this->users->isSuperAdmin($user) && $dto->role !== RoleName::Admin) {
@@ -26,9 +29,8 @@ readonly class AssignRoleAction
                 ]);
             }
 
-            // Verrou sur le rôle Admin : deux admins qui se retirent le rôle en même temps ne laissent pas zéro admin
             if ($user->hasRole(RoleName::Admin->value) && $dto->role !== RoleName::Admin
-                && $this->users->countAdminsWithLock() <= 1) {
+                && $this->users->countAdmins() <= 1) {
                 throw ValidationException::withMessages([
                     'role' => 'Impossible de retirer le rôle Admin : c\'est le dernier administrateur.',
                 ]);

@@ -20,7 +20,9 @@ readonly class ListUsersWithRolesAction
 
     /*
      * Comme la liste des membres (ListMembersAction) : recherche, tri et pagination en PHP sur l'ensemble des comptes
-     * (quelques dizaines), pour une recherche insensible aux accents identique sur PostgreSQL et SQLite.
+     * (quelques dizaines), pour une recherche insensible aux accents identique sur PostgreSQL et SQLite. Nombre de
+     * requêtes constant (prénoms et rôles chargés d'avance, voir ManageRolesTest). Limite connue : au-delà de quelques
+     * milliers de comptes, filtrer et paginer en SQL (extension `unaccent` de PostgreSQL).
      */
     public function __invoke(ListUsersDTO $dto): UserListResultDTO
     {

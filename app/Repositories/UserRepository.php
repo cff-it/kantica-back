@@ -8,6 +8,7 @@ use App\Enums\VoicePart;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
 
 class UserRepository
@@ -68,8 +69,13 @@ class UserRepository
     {
         $superAdminMail = config('kantica.super_admin.mail');
 
+        // Comparaison sans tenir compte de la casse, comme isSuperAdmin() : SUPER_ADMIN_MAIL peut différer de l'email
+        // enregistré par la casse (sensible sous PostgreSQL)
         return User::with(['firstnames', 'roles',])
-            ->when(filled($superAdminMail), fn ($query) => $query->where('mail', '!=', $superAdminMail))
+            ->when(
+                filled($superAdminMail),
+                fn ($query) => $query->whereRaw('lower(mail) <> ?', [Str::lower($superAdminMail),]),
+            )
             ->get();
     }
 
@@ -77,15 +83,19 @@ class UserRepository
     {
         $superAdminMail = config('kantica.super_admin.mail');
 
-        return filled($superAdminMail) && strcasecmp($user->mail, $superAdminMail) === 0;
+        return filled($superAdminMail) && Str::lower($user->mail) === Str::lower($superAdminMail);
     }
 
-    // À appeler dans une transaction : la ligne du rôle Admin est verrouillée jusqu'à la fin de la transaction, et le
-    // décompte est relu ensuite (deux retraits simultanés du rôle Admin passent l'un après l'autre)
-    public function countAdminsWithLock(): int
+    // À appeler au début d'une transaction, avant toute lecture des rôles : la ligne du rôle Admin reste verrouillée
+    // jusqu'à la fin de la transaction, les changements de rôle passent donc l'un après l'autre et chacun relit des
+    // rôles à jour (sans effet sous SQLite, qui sérialise déjà les écritures)
+    public function lockRoleChanges(): void
     {
         Role::where('name', RoleName::Admin->value)->lockForUpdate()->first();
+    }
 
+    public function countAdmins(): int
+    {
         return User::role(RoleName::Admin->value)->count();
     }
 

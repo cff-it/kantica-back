@@ -9,6 +9,7 @@ use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\VoiceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\Feature\Member\Concerns\CreatesMembers;
 use Tests\TestCase;
@@ -102,6 +103,49 @@ class ManageRolesTest extends TestCase
             ->assertJsonPath('meta.total', 1)
             ->assertJsonPath('meta.role_counts.admin', 1)
             ->assertJsonPath('data.0.id', $admin->id);
+    }
+
+    public function test_the_original_admin_account_is_hidden_whatever_the_case_of_its_email(): void
+    {
+        config(['kantica.super_admin.mail' => 'Admin@Kantica.test',]);
+        $original = $this->userWithRole(RoleName::Admin);
+        $original->update(['mail' => 'admin@kantica.test',]);
+        $admin = $this->member('Andriamanana', 'Feno', 'T', role: RoleName::Admin);
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/users')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('meta.role_counts.admin', 1);
+
+        // Protégé de la même façon au changement de rôle
+        $this->putJson("/api/users/{$original->id}/role", ['role' => 'membre',])->assertUnprocessable();
+    }
+
+    public function test_the_number_of_queries_does_not_grow_with_the_number_of_accounts(): void
+    {
+        $admin = $this->member('Andriamanana', 'Feno', 'T', role: RoleName::Admin);
+        $this->member('Rabe', 'Mialy', 'S');
+        Sanctum::actingAs($admin);
+
+        $count = function (): int {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->getJson('/api/users')->assertOk();
+            DB::disableQueryLog();
+
+            return count(DB::getQueryLog());
+        };
+
+        // Premier appel à vide : il charge aussi le cache des permissions
+        $count();
+        $withTwo = $count();
+
+        foreach (range(1, 15) as $index) {
+            $this->member('Membre'.$index, 'Test', 'S', role: $index % 2 ? RoleName::Member : RoleName::Secretary);
+        }
+
+        $this->assertSame($withTwo, $count());
     }
 
     public function test_only_an_admin_can_list_the_accounts(): void
