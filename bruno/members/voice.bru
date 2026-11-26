@@ -1,0 +1,39 @@
+meta {
+  name: voice
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/members/{{memberId}}/voice
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{secretaryToken}}
+}
+
+headers {
+  Accept: application/json
+}
+
+body:json {
+  {
+    "voice": "T"
+  }
+}
+
+tests {
+  test("voix attribuée", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data.profile.voice_group).to.equal("T");
+  });
+}
+
+docs {
+  Attribution de la voix seule d'un membre (KAN-34, US-10) : S, A, T ou B. Le reste de la fiche n'est pas demandé.
+  Lancer d'abord `login-secretary` (token `secretaryToken`) et `auth/register` (`memberId`).
+  Le membre doit avoir une fiche de recensement : sinon 422 sur `voice`. Si le groupe change, la voix précise
+  (A2...) est effacée ; même groupe, rien ne change. 403 pour un compte `membre`, 404 pour un membre inconnu.
+}
