@@ -2,11 +2,15 @@
 
 namespace Tests\Feature\Member;
 
+use App\Enums\DatePrecision;
 use App\Enums\RoleName;
+use App\Enums\SacramentType;
 use App\Enums\UserStatus;
 use App\Http\Middleware\EnsureAccountIsActive;
 use App\Models\User;
+use App\Models\UserEngagement;
 use App\Models\UserProfile;
+use App\Models\UserSacrament;
 use App\Models\Voice;
 use App\Models\VoiceGroup;
 use Database\Seeders\RoleSeeder;
@@ -93,6 +97,64 @@ class AssignVoiceTest extends TestCase
             ->assertJsonPath('data.profile.voice', 'A2');
     }
 
+    public function test_the_rest_of_the_record_is_untouched_when_the_group_changes(): void
+    {
+        $member = $this->member('Rasoanaivo', 'Hanta', 'A');
+        $member->profile->update([
+            'voice_id'      => Voice::where('name', 'A2')->value('id'),
+            'address'       => 'Lot II A 12 Faravohitra',
+            'birth_place'   => 'Antananarivo',
+            'social_pseudo' => 'hanta.r',
+        ]);
+        UserEngagement::create([
+            'user_id'                 => $member->id,
+            'adhesion_date'           => '2019-09-01',
+            'adhesion_date_precision' => DatePrecision::Month,
+            'engagement_place'        => 'Faravohitra',
+        ]);
+        UserSacrament::create([
+            'user_id' => $member->id,
+            'type'    => SacramentType::Baptism,
+            'date'    => '2000-05-14',
+            'place'   => 'Andohalo',
+        ]);
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $this->putJson("/api/members/{$member->id}/voice", ['voice' => 'B',])
+            ->assertOk()
+            ->assertJsonPath('data.profile.voice_group', 'B')
+            ->assertJsonPath('data.profile.voice', null);
+
+        $this->assertDatabaseHas('user_profiles', [
+            'user_id'        => $member->id,
+            'voice_group_id' => VoiceGroup::where('abbreviation', 'B')->value('id'),
+            'voice_id'       => null,
+            'phone'          => '034 12 345 67',
+            'address'        => 'Lot II A 12 Faravohitra',
+            'birth_place'    => 'Antananarivo',
+            'social_pseudo'  => 'hanta.r',
+        ]);
+        $this->assertDatabaseHas('user_engagements', ['user_id' => $member->id, 'engagement_place' => 'Faravohitra',]);
+        $this->assertDatabaseHas('user_sacraments', ['user_id' => $member->id, 'place' => 'Andohalo',]);
+        $this->assertSame('Rasoanaivo', $member->refresh()->last_name);
+    }
+
+    public function test_nothing_is_written_when_the_group_is_unchanged(): void
+    {
+        $member = $this->member('Rasoanaivo', 'Hanta', 'A');
+        $member->profile->update(['voice_id' => Voice::where('name', 'A2')->value('id'),]);
+        $updatedAt = $member->profile->refresh()->updated_at;
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $this->travel(5)->minutes();
+
+        $this->putJson("/api/members/{$member->id}/voice", ['voice' => 'A',])->assertOk();
+
+        $profile = $member->profile->refresh();
+        $this->assertTrue($profile->updated_at->equalTo($updatedAt));
+        $this->assertSame(Voice::where('name', 'A2')->value('id'), $profile->voice_id);
+    }
+
     public function test_the_voice_of_a_pending_member_can_be_assigned(): void
     {
         $member = $this->member('Rakoto', 'Jean', 'A', UserStatus::Pending);
@@ -125,7 +187,7 @@ class AssignVoiceTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonPath('errors.voice.0', 'La voix est obligatoire.');
 
-        foreach (['X', 's', 'Soprano', 'A2',] as $voice) {
+        foreach (['X', 's', 'Soprano', 'A2', ['S',], ['voice' => 'S',], 1, true,] as $voice) {
             $this->putJson("/api/members/{$member->id}/voice", ['voice' => $voice,])
                 ->assertUnprocessable()
                 ->assertJsonPath('errors.voice.0', 'La voix doit être S, A, T ou B.');

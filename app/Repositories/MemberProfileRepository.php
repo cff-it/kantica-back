@@ -60,13 +60,23 @@ class MemberProfileRepository
         UserProfile::updateOrCreate(['user_id' => $user->id,], $attributes);
     }
 
-    // Groupe de voix et voix précise d'une fiche existante, sans toucher aux autres champs
-    public function updateVoice(UserProfile $profile, int $voiceGroupId, ?int $voiceId): void
+    public function existsFor(User $user): bool
     {
-        $profile->update([
-            'voice_group_id' => $voiceGroupId,
-            'voice_id'       => $voiceId,
-        ]);
+        return UserProfile::where('user_id', $user->id)->exists();
+    }
+
+    // Change le groupe de voix d'une fiche et efface sa voix précise (A2...), qui n'appartient qu'à l'ancien groupe.
+    // Une seule requête UPDATE conditionnelle, sans lecture préalable : rien n'est écrit si le groupe est déjà le bon,
+    // et deux appels concurrents (ou un PUT complet en parallèle) ne peuvent pas réécrire une voix précise périmée.
+    // Renvoie le nombre de fiches modifiées (0 ou 1). Les autres champs de la fiche ne sont pas touchés.
+    public function changeVoiceGroup(User $user, int $voiceGroupId): int
+    {
+        return UserProfile::where('user_id', $user->id)
+            ->where('voice_group_id', '<>', $voiceGroupId)
+            ->update([
+                'voice_group_id' => $voiceGroupId,
+                'voice_id'       => null,
+            ]);
     }
 
     /**
