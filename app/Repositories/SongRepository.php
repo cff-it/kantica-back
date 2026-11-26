@@ -24,9 +24,16 @@ class SongRepository
         return Song::findOrFail($id);
     }
 
-    public function findWithSections(int $id): Song
+    // Le cantique avec ses sections et ses utilisations en messe. Seules les messes déjà célébrées (date du jour comprise)
+    // comptent : une messe préparée pour plus tard n'est pas encore un chant "chanté".
+    public function findWithSectionsAndUsage(int $id): Song
     {
-        return Song::with('sections')->findOrFail($id);
+        return Song::with([
+            'sections',
+            'massSongs' => fn ($massSongs) => $massSongs
+                ->whereHas('massPart.mass', fn ($mass) => $mass->whereDate('date', '<=', today()))
+                ->with(['massPart.mass', 'massPart.type',]),
+        ])->findOrFail($id);
     }
 
     public function create(array $data): Song
