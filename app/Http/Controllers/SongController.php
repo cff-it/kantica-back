@@ -34,7 +34,7 @@ class SongController extends Controller
 
     public function show(int $song, SongRepository $songs): SongResource
     {
-        return SongResource::make($songs->findById($song));
+        return SongResource::make($songs->findWithSections($song));
     }
 
     public function store(CreateSongRequest $request, CreateSongAction $action): JsonResponse

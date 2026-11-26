@@ -24,6 +24,11 @@ class SongRepository
         return Song::findOrFail($id);
     }
 
+    public function findWithSections(int $id): Song
+    {
+        return Song::with('sections')->findOrFail($id);
+    }
+
     public function create(array $data): Song
     {
         return Song::create($data);

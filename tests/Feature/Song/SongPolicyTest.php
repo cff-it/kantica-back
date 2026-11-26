@@ -5,7 +5,6 @@ namespace Tests\Feature\Song;
 use App\Enums\RoleName;
 use App\Http\Requests\Song\CreateSongRequest;
 use App\Http\Requests\Song\DeleteSongRequest;
-use App\Http\Requests\Song\UpdateSongRequest;
 use App\Models\Song;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
@@ -54,13 +53,15 @@ class SongPolicyTest extends TestCase
         }
     }
 
-    // Défense en profondeur : les FormRequests contrôlent aussi le rôle, indépendamment du `->can` des routes
+    // Défense en profondeur : les FormRequests contrôlent aussi le rôle, indépendamment du `->can` des routes.
+    // UpdateSongRequest (KAN-38) charge le cantique de la route pour la Policy : elle est couverte par HTTP
+    // (SaveSongAuthorizationTest), pas ici
     public function test_the_form_requests_check_the_role_too(): void
     {
         $admin = $this->userWithRole(RoleName::Admin);
         $member = $this->userWithRole(RoleName::Member);
 
-        foreach ([CreateSongRequest::class, UpdateSongRequest::class, DeleteSongRequest::class,] as $class) {
+        foreach ([CreateSongRequest::class, DeleteSongRequest::class,] as $class) {
             foreach ([[$admin, true,], [$member, false,],] as [$user, $allowed]) {
                 $request = new $class();
                 $request->setUserResolver(fn () => $user);
