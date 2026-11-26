@@ -102,10 +102,19 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
                 ->middleware('can:view,userImport');
         });
 
-        Route::get('/', [UserController::class, 'index']);
-        Route::post('/', [UserController::class, 'store']);
-        Route::get('/{user}', [UserController::class, 'show']);
-        Route::post('/{user}/roles', [UserController::class, 'assignRole']);
+        // Réservées à l'admin (KAN-35) : « Gestion des rôles » et comptes. Identifiants bruts et Policy appelée avec la
+        // classe : le refus 403 passe avant tout 404
+        Route::get('/', [UserController::class, 'index'])
+            ->can('viewAny', User::class);
+        Route::post('/', [UserController::class, 'store'])
+            ->can('create', User::class);
+        Route::get('/{user}', [UserController::class, 'show'])
+            ->whereNumber('user')
+            ->can('viewAny', User::class);
+        // Un seul rôle par compte : remplace l'ancien POST /{user}/roles, qui ajoutait un rôle sans retirer les autres
+        Route::put('/{user}/role', [UserController::class, 'assignRole'])
+            ->whereNumber('user')
+            ->can('assignRole', User::class);
     });
 
     // ── Événements ──────────────────────────────────────────────────────
