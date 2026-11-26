@@ -1,0 +1,38 @@
+meta {
+  name: show
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/songs/{{songId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("cantique avec ses sections numérotées", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data.id).to.equal(bru.getVar("songId"));
+    expect(res.body.data.sections).to.be.an("array");
+    res.body.data.sections.forEach((section) => {
+      expect(section.type).to.be.oneOf(["couplet", "refrain", "pont"]);
+      expect(section.text).to.be.a("string");
+      expect(section.number === null || Number.isInteger(section.number)).to.equal(true);
+    });
+  });
+}
+
+docs {
+  Consulte un cantique avec ses sections dans l'ordre de saisie. `number` est le numéro saisi par l'admin (Couplet 1, 2, 3), ou
+  `null` s'il n'y en a pas : il n'est pas calculé. Le libellé « Couplet 2 » est composé par le front. La liste `GET /songs` ne
+  renvoie pas les sections.
+}
