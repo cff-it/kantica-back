@@ -17,6 +17,8 @@ mkdir -p \
 chown -R www-data:www-data storage bootstrap/cache
 
 envsubst '${PORT}' < /etc/nginx/kantica.conf.template > /etc/nginx/http.d/default.conf
+# Échoue tôt et clairement si la configuration générée est invalide (PORT vide, par exemple)
+nginx -t
 
 # Migrations, rôles, admin originel, voix : échoue (et arrête le déploiement) si une étape ne passe pas
 su-exec www-data php artisan app:deploy
