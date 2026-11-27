@@ -213,11 +213,18 @@ public function toDTO(): CheckInDTO
   page, triés par titre sans tenir compte de la casse ni des accents (« Ô filii » est rangé avec les O). Comme pour les
   membres, recherche, tri et pagination sont faits en PHP sur tout le répertoire : même résultat sous PostgreSQL et SQLite.
 - `search` : titre ou auteur, sans casse ni accents, tous les mots doivent se retrouver ; 100 caractères au plus. La
-  référence et les paroles ne sont pas cherchées (champ « Titre ou auteur » de la maquette).
+  référence et les paroles ne sont pas cherchées (champ « Titre ou auteur » de la maquette). `page` est bornée à 100 000 :
+  sans borne, `PHP_INT_MAX` passait la validation et le décalage de la page (`forPage`) finissait en erreur 500. Les
+  listes des membres et des rôles n'ont pas encore cette borne.
 - Réponse : `SongResource` (sans les sections), `meta.total` qui suit la recherche, et `meta.songs_count` (« 13 cantiques »)
   qui porte sur tout le répertoire.
 - Accès : `SongPolicy::viewAny`, sur la route, ouvert aux trois rôles (membre, secrétaire, admin) ; un compte sans rôle
   reçoit un 403, un compte en attente le 403 `ACCOUNT_PENDING_VALIDATION` du middleware `account.active`.
+- Autres routes `/api/songs` (relevé par la revue de KAN-18) : `DELETE /{song}` est **réservé à l'admin** par
+  `DeleteSongRequest` (`SongPolicy::delete`, cantique chargé pour la Policy, 404 s'il n'existe pas) ; avant, tout compte
+  validé pouvait supprimer un cantique. `POST` et `PUT` passent par la Policy dans les FormRequests de KAN-38 (PR de Kevin,
+  non fusionnée au 27 novembre 2026 : sur `develop`, leur `authorize()` renvoie encore `true`). `GET /{song}` n'a pas de
+  contrôle de rôle : à poser avec la fiche (KAN-25).
 - Thèmes liturgiques (filtre `?theme=`, couleur) : reportés à KAN-23, dont le modèle n'est pas tranché (un ou plusieurs
   thèmes par cantique, liste fixe ou administrable, couleurs).
 - `Song::uniqueIds()` renvoie `['uuid']` : sans lui, `HasUuids` écrivait l'UUID dans `id` (bigint) et toute création de
@@ -225,9 +232,10 @@ public function toDTO(): CheckInDTO
 - Cantiques de démonstration : `php artisan db:seed --class=SongReferenceSeeder` (les 13 cantiques de la maquette, sans
   thème), tant que l'ajout d'un cantique (KAN-13) n'existe pas. Lancé à la main, jamais par `app:deploy` ; relancé, il ne
   crée que les titres absents et ne touche à aucun autre cantique. Requête Bruno `songs/list`.
-- **Vérifié** : `ListSongsTest` (25 tests, dont le jeu de démonstration), suite complète sous SQLite et sous PostgreSQL,
-  appels réels sur la base de dev avec un compte membre (tri, recherche sans accents, compteur, 422, 401). **Non
-  vérifié** : la préprod Railway, où le jeu de démonstration n'a pas été chargé.
+- **Vérifié** : `ListSongsTest` (26 tests, dont le jeu de démonstration et la page trop grande), `DeleteSongTest`
+  (5 tests), suite complète sous SQLite et sous PostgreSQL, appels réels sur la base de dev avec un compte membre (tri,
+  recherche sans accents, compteur, 422, 401). **Non vérifié** : la préprod Railway, où le jeu de démonstration n'a pas
+  été chargé.
 
 ## Conventions de nommage
 

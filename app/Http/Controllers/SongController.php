@@ -8,6 +8,7 @@ use App\Actions\Song\ListSongsAction;
 use App\Actions\Song\UpdateSongAction;
 use App\Http\Requests\Song\AttachSongToMassRequest;
 use App\Http\Requests\Song\CreateSongRequest;
+use App\Http\Requests\Song\DeleteSongRequest;
 use App\Http\Requests\Song\ListSongsRequest;
 use App\Http\Requests\Song\UpdateSongRequest;
 use App\Http\Resources\MassPartResource;
@@ -46,7 +47,8 @@ class SongController extends Controller
         return SongResource::make($action($request->toDTO()));
     }
 
-    public function destroy(int $song, SongRepository $songs): JsonResponse
+    // Réservée à l'admin : DeleteSongRequest applique SongPolicy::delete
+    public function destroy(DeleteSongRequest $request, int $song, SongRepository $songs): JsonResponse
     {
         $songs->delete($songs->findById($song));
 

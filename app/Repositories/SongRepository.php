@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Collection;
 
 class SongRepository
 {
+    // Tout le répertoire, sans tri SQL : ListSongsAction trie en PHP (sans casse ni accents)
     public function all(): Collection
     {
-        return Song::orderBy('title')->get();
+        return Song::all();
     }
 
     public function findById(int $id): Song

@@ -184,6 +184,17 @@ class ListSongsTest extends TestCase
             ->assertJsonValidationErrors(['page' => 'La page doit être supérieure ou égale à 1.',]);
     }
 
+    // Sans borne haute, PHP_INT_MAX passait la validation et le calcul du décalage de la page finissait en erreur 500
+    public function test_a_huge_page_is_refused_instead_of_failing(): void
+    {
+        $this->actingAsMember();
+
+        $this->getJson('/api/songs?page=100000')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/songs?page='.PHP_INT_MAX)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['page' => 'La page demandée est trop grande.',]);
+    }
+
     public function test_a_too_long_search_is_refused(): void
     {
         $this->actingAsMember();
