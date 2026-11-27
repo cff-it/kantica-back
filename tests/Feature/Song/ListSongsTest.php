@@ -50,29 +50,40 @@ class ListSongsTest extends TestCase
         $this->song('adeste fideles');
         $this->song('Minuit, chrétiens');
         $this->song('Écoute la voix du Seigneur');
+        $this->song('Cœur de Jésus');
         $this->actingAsMember();
 
         $response = $this->getJson('/api/songs')->assertOk();
 
+        // « Cœur » est rangé comme « coeur », « Écoute » avec les E et « Ô filii » avec les O
         $this->assertSame(
-            ['adeste fideles', 'Écoute la voix du Seigneur', 'Minuit, chrétiens', 'Ô filii et filiae', 'Salve Regina',],
+            [
+                'adeste fideles', 'Cœur de Jésus', 'Écoute la voix du Seigneur', 'Minuit, chrétiens', 'Ô filii et filiae',
+                'Salve Regina',
+            ],
             $response->json('data.*.title'),
         );
     }
 
-    public function test_a_row_carries_the_title_the_author_and_the_reference_without_the_sections(): void
+    // SongListItemResource : ce que la liste affiche, sans les notes, les dates ni les sections (SongResource)
+    public function test_a_row_carries_only_the_id_the_title_the_author_and_the_reference(): void
     {
-        $song = $this->song('Adeste fideles', 'John Francis Wade', '012');
+        $song = Song::create([
+            'title'     => 'Adeste fideles',
+            'author'    => 'John Francis Wade',
+            'reference' => '012',
+            'notes'     => 'Chanté à la messe de minuit',
+        ]);
         $this->actingAsMember();
 
         $this->getJson('/api/songs')
             ->assertOk()
-            ->assertJsonPath('data.0.id', $song->id)
-            ->assertJsonPath('data.0.uuid', $song->uuid)
-            ->assertJsonPath('data.0.title', 'Adeste fideles')
-            ->assertJsonPath('data.0.author', 'John Francis Wade')
-            ->assertJsonPath('data.0.reference', '012')
-            ->assertJsonMissingPath('data.0.sections');
+            ->assertJsonPath('data.0', [
+                'id'        => $song->id,
+                'title'     => 'Adeste fideles',
+                'author'    => 'John Francis Wade',
+                'reference' => '012',
+            ]);
     }
 
     /**
@@ -87,6 +98,7 @@ class ListSongsTest extends TestCase
         $this->song('Minuit, chrétiens', 'Adolphe Adam', '058');
         $this->song('Ô filii et filiae', 'Jean Tisserand', '071');
         $this->song('Kyrie XVII', 'Grégorien', '060');
+        $this->song('Cœur de Jésus');
         $this->actingAsMember();
 
         $response = $this->getJson('/api/songs?search='.urlencode($search))->assertOk();
@@ -105,6 +117,9 @@ class ListSongsTest extends TestCase
             'auteur complet'       => ['Adolphe Adam', ['Minuit, chrétiens',],],
             'titre puis auteur'    => ['adeste wade', ['Adeste fideles',],],
             'plusieurs résultats'  => ['ad', ['Adeste fideles', 'Minuit, chrétiens',],],
+            'œ tapé « oe »'        => ['coeur', ['Cœur de Jésus',],],
+            'œ tapé tel quel'      => ['CŒUR', ['Cœur de Jésus',],],
+            'cantique sans auteur' => ['jesus', ['Cœur de Jésus',],],
             'référence non cherchée' => ['012', [],],
             'aucun résultat'       => ['xyz', [],],
         ];

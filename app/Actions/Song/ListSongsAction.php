@@ -18,13 +18,14 @@ readonly class ListSongsAction
     public function __construct(private SongRepository $songs) {}
 
     /*
-     * Comme la liste des membres (ListMembersAction) : recherche, tri et pagination en PHP sur tout le répertoire
-     * (quelques centaines de cantiques), pour une recherche insensible aux accents identique sur PostgreSQL et SQLite.
-     * Au-delà de quelques milliers de cantiques, filtrer et paginer en SQL (extension `unaccent` de PostgreSQL).
+     * Comme la liste des membres (ListMembersAction) : recherche, tri et pagination en PHP sur tout le répertoire, pour
+     * une recherche insensible aux accents identique sur PostgreSQL et SQLite. Seules les quatre colonnes de la liste sont
+     * lues (`allForList`). Hypothèse de volume : le répertoire d'une chorale, quelques centaines de cantiques (références
+     * jusqu'à 101 sur la maquette). Au-delà de quelques milliers, filtrer et paginer en SQL (extension `unaccent`).
      */
     public function __invoke(ListSongsDTO $dto): SongListResultDTO
     {
-        $all = $this->songs->all();
+        $all = $this->songs->allForList();
 
         $matching = $all
             ->when(filled($dto->search), fn (Collection $songs) => $songs->filter(
@@ -48,10 +49,10 @@ readonly class ListSongsAction
     }
 
     // Tous les termes saisis doivent se retrouver dans le titre ou l'auteur (« adeste wade » fonctionne), comme le
-    // champ « Titre ou auteur » de la maquette : ni la référence ni les paroles
+    // champ « Titre ou auteur » de la maquette : ni la référence ni les paroles. L'auteur peut être absent
     private function matches(Song $song, string $search): bool
     {
-        $haystack = $this->normalize($song->title.' '.$song->author);
+        $haystack = $this->normalize(trim($song->title.' '.$song->author));
         $terms = preg_split('/\s+/', $this->normalize($search), -1, PREG_SPLIT_NO_EMPTY);
 
         return collect($terms)->every(fn (string $term) => str_contains($haystack, $term));
@@ -63,6 +64,7 @@ readonly class ListSongsAction
         return [$this->normalize($song->title), $song->id,];
     }
 
+    // Minuscules puis translittération : « Cœur » → « coeur », « Æterna » → « aeterna », « Straße » → « strasse »
     private function normalize(string $value): string
     {
         return Str::ascii(Str::lower($value));

@@ -12,6 +12,7 @@ use App\Http\Requests\Song\DeleteSongRequest;
 use App\Http\Requests\Song\ListSongsRequest;
 use App\Http\Requests\Song\UpdateSongRequest;
 use App\Http\Resources\MassPartResource;
+use App\Http\Resources\SongListItemResource;
 use App\Http\Resources\SongResource;
 use App\Repositories\SongRepository;
 use Illuminate\Http\JsonResponse;
@@ -25,7 +26,7 @@ class SongController extends Controller
         $list = $action($request->toDTO());
 
         // `meta.total` (pagination) suit la recherche ; `songs_count` (« 13 cantiques ») porte sur tout le répertoire
-        return SongResource::collection($list->songs)->additional([
+        return SongListItemResource::collection($list->songs)->additional([
             'meta' => ['songs_count' => $list->songsCount,],
         ]);
     }

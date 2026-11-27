@@ -31,8 +31,8 @@ docs {
   - `search` : titre ou auteur, sans tenir compte de la casse ni des accents ; plusieurs mots = tous doivent correspondre.
     La référence et les paroles ne sont pas cherchées (champ « Titre ou auteur » de la maquette)
   - `page` : numéro de page, 1 par défaut ; 20 cantiques par page, triés par titre (sans casse ni accents)
-  - `data[]` : le cantique au format de `SongResource` (`id`, `uuid`, `title`, `author`, `reference`, `notes`, dates), sans
-    les sections ni l'historique d'usage (voir `show`)
+  - `data[]` : une ligne au format de `SongListItemResource` (`id`, `title`, `author`, `reference`) ; le cantique complet
+    (notes, sections, historique d'usage) est servi par `show`
   - `meta.total` suit la recherche ; `meta.songs_count` (« 13 cantiques ») porte sur tout le répertoire
 }
 
