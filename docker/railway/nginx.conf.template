@@ -1,0 +1,47 @@
+# Gabarit nginx du conteneur Railway : ${PORT} est remplacé au démarrage par envsubst (voir entrypoint.sh).
+
+# Le TLS est terminé par le proxy de Railway : on retransmet le schéma d'origine à PHP, sans quoi Laravel se croit
+# en HTTP et refuse les liens signés (vérification d'email) générés en HTTPS.
+map $http_x_forwarded_proto $kantica_https {
+    default '';
+    https   on;
+}
+
+server {
+    listen ${PORT};
+    listen [::]:${PORT};
+    server_name _;
+
+    root /var/www/public;
+    index index.php;
+
+    # Aligné sur docker/php/local.ini (upload_max_filesize, post_max_size)
+    client_max_body_size 40m;
+
+    # Le conteneur n'est joignable que par le proxy de Railway ou le réseau privé (nginx du front) : on leur fait
+    # confiance pour l'adresse du client, nécessaire aux limites de débit par IP (throttle).
+    set_real_ip_from 0.0.0.0/0;
+    set_real_ip_from ::/0;
+    real_ip_header X-Real-IP;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        try_files $uri =404;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+        fastcgi_param HTTPS $kantica_https if_not_empty;
+        # Génération PPTX et imports : peuvent dépasser les 60 s par défaut
+        fastcgi_read_timeout 120s;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
