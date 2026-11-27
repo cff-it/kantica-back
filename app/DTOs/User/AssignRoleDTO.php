@@ -2,10 +2,12 @@
 
 namespace App\DTOs\User;
 
+use App\Enums\RoleName;
+
 class AssignRoleDTO
 {
     public function __construct(
         public readonly int $userId,
-        public readonly string $role,
+        public readonly RoleName $role,
     ) {}
 }

@@ -1,0 +1,38 @@
+<?php
+
+namespace App\Http\Requests\User;
+
+use App\DTOs\User\ListUsersDTO;
+use Illuminate\Foundation\Http\FormRequest;
+
+class ListUsersRequest extends FormRequest
+{
+    // L'accès (Admin) est contrôlé par la Policy sur la route
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'search' => ['nullable', 'string', 'max:100',],
+            'page'   => ['nullable', 'integer', 'min:1',],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'page.min' => 'La page doit être supérieure ou égale à 1.',
+        ];
+    }
+
+    public function toDTO(): ListUsersDTO
+    {
+        return new ListUsersDTO(
+            search: $this->input('search'),
+            page: max(1, $this->integer('page', 1)),
+        );
+    }
+}

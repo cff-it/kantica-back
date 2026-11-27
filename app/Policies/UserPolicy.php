@@ -8,29 +8,32 @@ use App\Models\User;
 
 class UserPolicy
 {
+    // « Gestion des rôles » (US-25) et routes /api/users : réservées à l'admin
     public function viewAny(User $user): bool
     {
-        return $user->hasRole(['admin', 'responsable']);
+        return $user->hasRole(RoleName::Admin->value);
     }
 
     public function view(User $user, User $model): bool
     {
-        return $user->id === $model->id || $user->hasRole('admin');
+        return $user->id === $model->id || $user->hasRole(RoleName::Admin->value);
     }
 
     public function create(User $user): bool
     {
-        return $user->hasRole('admin');
+        return $user->hasRole(RoleName::Admin->value);
     }
 
     public function update(User $user, User $model): bool
     {
-        return $user->id === $model->id || $user->hasRole('admin');
+        return $user->id === $model->id || $user->hasRole(RoleName::Admin->value);
     }
 
-    public function assignRole(User $user, User $model): bool
+    // Seul l'admin change le rôle d'un compte (US-25) ; appelée avec la classe, sans compte ciblé, pour que le refus
+    // 403 passe avant tout 404
+    public function assignRole(User $user): bool
     {
-        return $user->hasRole('admin');
+        return $user->hasRole(RoleName::Admin->value);
     }
 
     public function validate(User $user, User $member): bool
