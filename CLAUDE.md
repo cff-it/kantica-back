@@ -180,7 +180,7 @@ public function toDTO(): CheckInDTO
 
 | Module | Actions principales |
 |---|---|
-| **Répertoire chants** | `CreateSong`, `UpdateSong`, `AttachSongToMass` |
+| **Répertoire chants** | `CreateSong`, `UpdateSong`, `AttachSongToMass`, `ListSongsAction` (`GET /api/songs`, KAN-18 : recherche par titre ou auteur, 20 par page) |
 | **Liturgie messes** | `CreateMass`, `AssignSongToMassPart`, `GeneratePptx` |
 | **Membres & rôles** | `CreateUser`, `AssignRole`, `AssignMassRole`, `AssignVoiceAction` (`PUT /api/members/{member}/voice`, KAN-34 : voix seule, 422 sans fiche, voix précise effacée si le groupe change) |
 | **Événements** | `CreateEvent`, `RegisterMember`, `CheckInMember` |
@@ -206,6 +206,28 @@ public function toDTO(): CheckInDTO
 - `meta.role_counts` ne compte que les comptes affichés (sans le compte originel), alors que la garde « dernier admin »
   compte le compte originel : avec lui et un seul autre admin, l'écran affiche « 1 admin » et cet admin peut quitter
   le rôle. Voulu : le compte originel est un vrai admin, masqué de la liste.
+
+### Répertoire (KAN-18)
+
+- Liste du répertoire (US-04) : `ListSongsAction` (`GET /api/songs?search=&page=`, `ListSongsRequest`), 20 cantiques par
+  page, triés par titre sans tenir compte de la casse ni des accents (« Ô filii » est rangé avec les O). Comme pour les
+  membres, recherche, tri et pagination sont faits en PHP sur tout le répertoire : même résultat sous PostgreSQL et SQLite.
+- `search` : titre ou auteur, sans casse ni accents, tous les mots doivent se retrouver ; 100 caractères au plus. La
+  référence et les paroles ne sont pas cherchées (champ « Titre ou auteur » de la maquette).
+- Réponse : `SongResource` (sans les sections), `meta.total` qui suit la recherche, et `meta.songs_count` (« 13 cantiques »)
+  qui porte sur tout le répertoire.
+- Accès : `SongPolicy::viewAny`, sur la route, ouvert aux trois rôles (membre, secrétaire, admin) ; un compte sans rôle
+  reçoit un 403, un compte en attente le 403 `ACCOUNT_PENDING_VALIDATION` du middleware `account.active`.
+- Thèmes liturgiques (filtre `?theme=`, couleur) : reportés à KAN-23, dont le modèle n'est pas tranché (un ou plusieurs
+  thèmes par cantique, liste fixe ou administrable, couleurs).
+- `Song::uniqueIds()` renvoie `['uuid']` : sans lui, `HasUuids` écrivait l'UUID dans `id` (bigint) et toute création de
+  cantique échouait sous PostgreSQL. Correction reprise à l'identique de la PR de KAN-38, pour une fusion sans conflit.
+- Cantiques de démonstration : `php artisan db:seed --class=SongReferenceSeeder` (les 13 cantiques de la maquette, sans
+  thème), tant que l'ajout d'un cantique (KAN-13) n'existe pas. Lancé à la main, jamais par `app:deploy` ; relancé, il ne
+  crée que les titres absents et ne touche à aucun autre cantique. Requête Bruno `songs/list`.
+- **Vérifié** : `ListSongsTest` (25 tests, dont le jeu de démonstration), suite complète sous SQLite et sous PostgreSQL,
+  appels réels sur la base de dev avec un compte membre (tri, recherche sans accents, compteur, 422, 401). **Non
+  vérifié** : la préprod Railway, où le jeu de démonstration n'a pas été chargé.
 
 ## Conventions de nommage
 

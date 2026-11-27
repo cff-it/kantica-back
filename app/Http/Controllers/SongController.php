@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Actions\Song\AttachSongToMassAction;
 use App\Actions\Song\CreateSongAction;
+use App\Actions\Song\ListSongsAction;
 use App\Actions\Song\UpdateSongAction;
 use App\Http\Requests\Song\AttachSongToMassRequest;
 use App\Http\Requests\Song\CreateSongRequest;
+use App\Http\Requests\Song\ListSongsRequest;
 use App\Http\Requests\Song\UpdateSongRequest;
 use App\Http\Resources\MassPartResource;
 use App\Http\Resources\SongResource;
@@ -16,9 +18,15 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class SongController extends Controller
 {
-    public function index(SongRepository $songs): AnonymousResourceCollection
+    // Répertoire (US-04) : recherche par titre ou auteur, 20 cantiques par page, triés par titre
+    public function index(ListSongsRequest $request, ListSongsAction $action): AnonymousResourceCollection
     {
-        return SongResource::collection($songs->all());
+        $list = $action($request->toDTO());
+
+        // `meta.total` (pagination) suit la recherche ; `songs_count` (« 13 cantiques ») porte sur tout le répertoire
+        return SongResource::collection($list->songs)->additional([
+            'meta' => ['songs_count' => $list->songsCount,],
+        ]);
     }
 
     public function show(int $song, SongRepository $songs): SongResource

@@ -2,14 +2,16 @@
 
 namespace App\Policies;
 
+use App\Enums\RoleName;
 use App\Models\Song;
 use App\Models\User;
 
 class SongPolicy
 {
+    // Répertoire (US-04) : tous les rôles, de Membre à Admin. Le compte doit aussi être validé (middleware de la route)
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasRole([RoleName::Admin->value, RoleName::Secretary->value, RoleName::Member->value,]);
     }
 
     public function view(User $user, Song $song): bool

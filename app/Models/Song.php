@@ -25,6 +25,12 @@ class Song extends Model
 
     protected $fillable = ['title', 'author', 'reference', 'notes'];
 
+    // L'UUID est dans la colonne `uuid` ; `id` reste l'entier auto-incrémenté (par défaut, HasUuids cible la clé primaire)
+    public function uniqueIds(): array
+    {
+        return ['uuid'];
+    }
+
     public function themes(): BelongsToMany
     {
         return $this->belongsToMany(SongTheme::class, 'song_song_theme');
