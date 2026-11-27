@@ -2,19 +2,17 @@
 
 namespace App\Repositories;
 
+use App\Enums\RoleName;
 use App\Enums\UserStatus;
 use App\Enums\VoicePart;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 
 class UserRepository
 {
-    public function all(): Collection
-    {
-        return User::with('firstnames')->orderBy('last_name')->get();
-    }
-
     // Membres actifs triés par nom, éventuellement d'une seule voix. Ne font pas partie des membres : les comptes en
     // attente et le compte administrateur originel (compte technique, identifié par SUPER_ADMIN_MAIL).
     // Requête commune à l'export et à la liste de la secrétaire (US-08).
@@ -46,10 +44,11 @@ class UserRepository
     }
 
     // Fiche de recensement complète (écran « Modifier la fiche ») : en plus de findById(), les sacrements, l'engagement
-    // et le contact d'urgence, qui ne sont pas nécessaires ailleurs
+    // et le contact d'urgence, qui ne sont pas nécessaires ailleurs, et le rôle (ligne « Rôle » de la fiche, KAN-35)
     public function findRecordById(int $id): User
     {
         return User::with([
+            'roles',
             'firstnames',
             'profile.voiceGroup',
             'profile.voice',
@@ -57,6 +56,54 @@ class UserRepository
             'engagement',
             'emergencyContacts',
         ])->findOrFail($id);
+    }
+
+    public function findWithRolesById(int $id): User
+    {
+        return User::with(['firstnames', 'roles',])->findOrFail($id);
+    }
+
+    // Comptes de « Gestion des rôles » (US-25), comptes en attente compris. Le compte administrateur originel (compte
+    // technique, identifié par SUPER_ADMIN_MAIL) n'y figure pas, comme dans la liste des membres.
+    public function allWithRoles(): Collection
+    {
+        $superAdminMail = config('kantica.super_admin.mail');
+
+        // Comparaison sans tenir compte de la casse, comme isSuperAdmin() : SUPER_ADMIN_MAIL peut différer de l'email
+        // enregistré par la casse (sensible sous PostgreSQL)
+        return User::with(['firstnames', 'roles',])
+            ->when(
+                filled($superAdminMail),
+                fn ($query) => $query->whereRaw('lower(mail) <> ?', [Str::lower($superAdminMail),]),
+            )
+            ->get();
+    }
+
+    public function isSuperAdmin(User $user): bool
+    {
+        $superAdminMail = config('kantica.super_admin.mail');
+
+        return filled($superAdminMail) && Str::lower($user->mail) === Str::lower($superAdminMail);
+    }
+
+    // À appeler au début d'une transaction, avant toute lecture des rôles : la ligne du rôle Admin reste verrouillée
+    // jusqu'à la fin de la transaction, les changements de rôle passent donc l'un après l'autre et chacun relit des
+    // rôles à jour (sans effet sous SQLite, qui sérialise déjà les écritures). La ligne existe toujours : les rôles
+    // sont créés par SyncRolesAction à chaque déploiement (sans elle, il n'y aurait aucun admin à protéger)
+    public function lockRoleChanges(): void
+    {
+        Role::where('name', RoleName::Admin->value)->lockForUpdate()->first();
+    }
+
+    public function countAdmins(): int
+    {
+        return User::role(RoleName::Admin->value)->count();
+    }
+
+    // Un seul rôle par compte : remplace tous les rôles existants
+    public function syncRole(User $user, RoleName $role): void
+    {
+        $user->syncRoles([$role->value,]);
     }
 
     public function findByMail(string $mail): ?User

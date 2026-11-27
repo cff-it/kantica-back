@@ -188,6 +188,25 @@ public function toDTO(): CheckInDTO
 
 ---
 
+### Rôles (KAN-35)
+
+- « Gestion des rôles » (US-25) : `ListUsersWithRolesAction` (`GET /api/users?search=&page=`, 20 par page, rôle de
+  chaque compte et `meta.role_counts`) et `AssignRoleAction` (`PUT /api/users/{user}/role`, `{ role }`).
+- La fiche membre (`GET /api/members/{id}`, `UserRepository::findRecordById`) renvoie aussi `roles` : la
+  secrétaire voit le rôle, seul l'admin peut le changer (front : ligne « Rôle » de la fiche).
+- Trois rôles Spatie (`RoleName` : `admin`, `secretaire`, `membre`), créés par `SyncRolesAction` (`RoleSeeder`,
+  `app:deploy`). **Un seul rôle par compte** (`syncRoles`) ; `RoleName::highestOf()` donne le plus élevé pour les
+  anciens comptes qui en ont plusieurs. Pas de permissions Spatie : le front se base sur les rôles de `GET /api/me`.
+- Toutes les routes `/api/users` (hors import) sont **réservées à l'admin** (`UserPolicy`, appelée avec la classe
+  pour que le 403 passe avant le 404). L'ancien `POST /api/users/{user}/roles`, sans contrôle de rôle, est supprimé.
+- Garde-fous de `AssignRoleAction`, dans une transaction : le compte administrateur originel (`SUPER_ADMIN_MAIL`)
+  garde le rôle Admin ; le dernier admin ne peut pas perdre le sien. Le verrou (ligne du rôle Admin, `lockRoleChanges`)
+  est pris **avant** de lire le compte : deux changements simultanés passent l'un après l'autre. SQLite l'ignore :
+  `ManageRolesTest` vérifie l'ordre des appels, et la requête `FOR UPDATE` quand la suite tourne sous PostgreSQL (CI).
+- `meta.role_counts` ne compte que les comptes affichés (sans le compte originel), alors que la garde « dernier admin »
+  compte le compte originel : avec lui et un seul autre admin, l'écran affiche « 1 admin » et cet admin peut quitter
+  le rôle. Voulu : le compte originel est un vrai admin, masqué de la liste.
+
 ## Conventions de nommage
 
 - **Actions** : verbe + nom + suffixe `Action` → `CreateSongAction`, `CheckInMemberAction`, `GeneratePptxAction`

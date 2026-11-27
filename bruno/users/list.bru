@@ -1,0 +1,42 @@
+meta {
+  name: list
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/users
+  body: none
+  auth: bearer
+}
+
+params:query {
+  ~search: rabe
+  ~page: 2
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  « Gestion des rôles » (KAN-35, US-25) : réservé à l'admin (403 sinon). Lancer d'abord `auth/login` avec un
+  compte admin (`adminMail`, `adminPassword`), qui range le jeton dans `token`.
+
+  - `search` : nom, prénoms ou email, sans tenir compte de la casse ni des accents
+  - `data[]` : `id`, `mail`, `last_name`, `first_name`, `status`, `role` (`admin`, `secretaire`, `membre` ou null)
+  - `meta.role_counts` : nombre de comptes par rôle, hors recherche (« 1 admin · 1 secrétaire · 5 membres »)
+  - 20 comptes par page, triés par nom ; le compte administrateur originel (`SUPER_ADMIN_MAIL`) n'y figure pas
+}
+
+tests {
+  test("liste renvoyée avec les décomptes par rôle", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data).to.be.an("array");
+    expect(res.body.meta.role_counts).to.have.all.keys("admin", "secretaire", "membre");
+  });
+}
