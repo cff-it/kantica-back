@@ -1,0 +1,62 @@
+# Image de déploiement Railway (préprod) : un seul conteneur qui embarque nginx, PHP-FPM et le worker de la file
+# d'attente, pilotés par supervisord. Le `Dockerfile` racine reste celui du développement local (docker-compose).
+#
+# Le worker tourne dans le même conteneur que le web parce qu'un import de membres est déposé par le web sur le
+# disque `local` puis lu par le worker : un volume Railway ne se partage pas entre deux services.
+FROM php:8.4-fpm-alpine
+
+RUN apk add --no-cache \
+    bash \
+    curl \
+    gettext \
+    icu-dev \
+    libpng-dev \
+    libxml2-dev \
+    libzip-dev \
+    nginx \
+    oniguruma-dev \
+    postgresql-dev \
+    su-exec \
+    supervisor \
+    unzip \
+    zip
+
+RUN docker-php-ext-install \
+    pdo_pgsql \
+    pgsql \
+    mbstring \
+    exif \
+    pcntl \
+    bcmath \
+    gd \
+    intl \
+    zip \
+    opcache
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /var/www
+
+# Dépendances d'abord : la couche reste en cache tant que composer.lock ne change pas
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --no-scripts --no-autoloader --prefer-dist
+
+COPY . .
+
+RUN composer dump-autoload --no-dev --optimize --no-scripts \
+    && php artisan package:discover --ansi \
+    # Équivalent de `storage:link` : public/ appartient à root, le lien est donc posé à la construction
+    && ln -s /var/www/storage/app/public /var/www/public/storage
+
+COPY docker/php/local.ini /usr/local/etc/php/conf.d/local.ini
+COPY docker/railway/nginx.conf.template /etc/nginx/kantica.conf.template
+COPY docker/railway/supervisord.conf /etc/supervisord.conf
+COPY docker/railway/entrypoint.sh /usr/local/bin/kantica-entrypoint
+RUN chmod +x /usr/local/bin/kantica-entrypoint
+
+# Port d'écoute de nginx : Railway peut le surcharger via la variable PORT
+ENV PORT=8080
+EXPOSE 8080
+
+ENTRYPOINT ["kantica-entrypoint"]
+CMD ["supervisord", "-c", "/etc/supervisord.conf"]

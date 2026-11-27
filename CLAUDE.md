@@ -198,6 +198,23 @@ public function toDTO(): CheckInDTO
 
 ---
 
+## Déploiement (préprod Railway)
+
+Le service `kantica-back` du projet Railway `kantica` (environnement `preprod`) se construit avec
+`Dockerfile.railway`, pas avec le `Dockerfile` racine (réservé au docker-compose local), et suit `develop`.
+
+- Un seul conteneur : nginx, PHP-FPM et le worker `queue:work`, lancés par supervisord (`docker/railway/`). Le
+  worker reste dans le conteneur du web parce qu'ils partagent les fichiers d'import (disque `local`).
+- À chaque démarrage, `docker/railway/entrypoint.sh` lance `php artisan app:deploy` (migrations et données de
+  référence) puis `php artisan optimize`. Un échec arrête le déploiement.
+- Un volume est monté sur `storage/app` (photos des membres, fichiers d'import).
+- Variables à définir sur le service : `APP_KEY`, `APP_URL` (domaine public du back), `DB_*`, et
+  `SUPER_ADMIN_MAIL` / `SUPER_ADMIN_PASSWORD` tant qu'aucun admin n'existe.
+- Les mails partent dans les logs (`MAIL_MAILER=log`) tant qu'aucun SMTP n'est configuré.
+
+Vérifié en local (image construite, migrations, compte admin, connexion, worker démarré). L'envoi réel de mails
+et l'import de membres sur Railway ne sont pas vérifiés.
+
 ## Style de code (Laravel Pint)
 
 Le style est vérifié en CI par `vendor/bin/pint --test` (job `lint` de `.github/workflows/ci.yml`).
