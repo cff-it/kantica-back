@@ -6,6 +6,7 @@ use App\Enums\RoleName;
 use App\Enums\UserStatus;
 use App\Http\Middleware\EnsureAccountIsActive;
 use App\Models\User;
+use App\Repositories\UserRepository;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\VoiceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -244,6 +245,62 @@ class ManageRolesTest extends TestCase
 
         // Il compte parmi les admins : l'autre admin peut donc quitter le rôle
         $this->putJson("/api/users/{$admin->id}/role", ['role' => 'membre',])->assertOk();
+    }
+
+    public function test_the_original_admin_account_counts_as_an_admin_but_not_in_the_displayed_counts(): void
+    {
+        config(['kantica.super_admin.mail' => 'admin@kantica.test',]);
+        $original = $this->userWithRole(RoleName::Admin);
+        $original->update(['mail' => 'admin@kantica.test',]);
+        $admin = $this->member('Andriamanana', 'Feno', 'T', role: RoleName::Admin);
+        Sanctum::actingAs($admin);
+
+        // L'écran n'affiche que les comptes de la liste : « 1 admin »
+        $this->getJson('/api/users')->assertJsonPath('meta.role_counts.admin', 1);
+
+        // Mais le compte technique est un vrai admin : celui de la liste n'est pas le dernier
+        $this->putJson("/api/users/{$admin->id}/role", ['role' => 'membre',])->assertOk();
+        $this->assertTrue($original->refresh()->hasRole(RoleName::Admin->value));
+    }
+
+    public function test_the_role_changes_are_locked_before_the_account_is_read(): void
+    {
+        $admin = $this->member('Andriamanana', 'Feno', 'T', role: RoleName::Admin);
+        $member = $this->member('Rabe', 'Mialy', 'S');
+        $calls = new \ArrayObject();
+
+        // Dépôt qui note l'ordre des appels : SQLite sérialise déjà les écritures, la suite ne verrait pas la
+        // disparition du verrou sans cela
+        $this->app->instance(UserRepository::class, new class($calls) extends UserRepository
+        {
+            public function __construct(private \ArrayObject $calls) {}
+
+            public function lockRoleChanges(): void
+            {
+                $this->calls->append('lock');
+                parent::lockRoleChanges();
+            }
+
+            public function findWithRolesById(int $id): User
+            {
+                $this->calls->append('read');
+
+                return parent::findWithRolesById($id);
+            }
+        });
+        Sanctum::actingAs($admin);
+        DB::enableQueryLog();
+
+        $this->putJson("/api/users/{$member->id}/role", ['role' => 'secretaire',])->assertOk();
+
+        $this->assertSame(['lock', 'read', 'read',], $calls->getArrayCopy());
+
+        // Sous PostgreSQL (CI), la requête de verrou est bien un SELECT ... FOR UPDATE sur le rôle Admin
+        if (DB::getDriverName() === 'pgsql') {
+            $this->assertNotEmpty(collect(DB::getQueryLog())->filter(
+                fn (array $query) => str_contains($query['query'], 'for update') && str_contains($query['query'], 'roles'),
+            ));
+        }
     }
 
     public function test_the_role_is_validated(): void

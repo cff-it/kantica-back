@@ -77,6 +77,10 @@ readonly class ListUsersWithRolesAction
     }
 
     /**
+     * Décompte des comptes affichés, donc sans le compte administrateur originel (compte technique, masqué de la
+     * liste). La garde « dernier admin » d'AssignRoleAction le compte, elle : c'est un vrai admin. Avec ce compte et un
+     * seul autre admin, l'écran affiche « 1 admin » et cet admin peut quitter le rôle (voir ManageRolesTest).
+     *
      * @param  Collection<int, User>  $users
      * @return array<string, int>
      */

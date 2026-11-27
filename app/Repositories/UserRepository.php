@@ -88,7 +88,8 @@ class UserRepository
 
     // À appeler au début d'une transaction, avant toute lecture des rôles : la ligne du rôle Admin reste verrouillée
     // jusqu'à la fin de la transaction, les changements de rôle passent donc l'un après l'autre et chacun relit des
-    // rôles à jour (sans effet sous SQLite, qui sérialise déjà les écritures)
+    // rôles à jour (sans effet sous SQLite, qui sérialise déjà les écritures). La ligne existe toujours : les rôles
+    // sont créés par SyncRolesAction à chaque déploiement (sans elle, il n'y aurait aucun admin à protéger)
     public function lockRoleChanges(): void
     {
         Role::where('name', RoleName::Admin->value)->lockForUpdate()->first();
