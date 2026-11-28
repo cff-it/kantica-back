@@ -144,6 +144,9 @@ jobs:
         with:
           claude_code_oauth_token: ${{secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           use_sticky_comment: true
+          # Print the full Claude output in the logs, so that an is_error:true
+          # result shows its real message (quota, API error, etc.)
+          show_full_output: true
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}

@@ -6,6 +6,7 @@ use App\Actions\Song\AttachSongToMassAction;
 use App\Actions\Song\CreateSongAction;
 use App\Actions\Song\DeleteSongAction;
 use App\Actions\Song\ListSongsAction;
+use App\Actions\Song\ShowSongAction;
 use App\Actions\Song\UpdateSongAction;
 use App\Http\Requests\Song\AttachSongToMassRequest;
 use App\Http\Requests\Song\CreateSongRequest;
@@ -13,9 +14,9 @@ use App\Http\Requests\Song\DeleteSongRequest;
 use App\Http\Requests\Song\ListSongsRequest;
 use App\Http\Requests\Song\UpdateSongRequest;
 use App\Http\Resources\MassPartResource;
+use App\Http\Resources\SongDetailResource;
 use App\Http\Resources\SongListItemResource;
 use App\Http\Resources\SongResource;
-use App\Repositories\SongRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -32,9 +33,10 @@ class SongController extends Controller
         ]);
     }
 
-    public function show(int $song, SongRepository $songs): SongResource
+    // Le cantique avec ses sections et son historique d'usage (voir SongDetailResource)
+    public function show(int $song, ShowSongAction $action): SongDetailResource
     {
-        return SongResource::make($songs->findById($song));
+        return SongDetailResource::make($action($song));
     }
 
     public function store(CreateSongRequest $request, CreateSongAction $action): JsonResponse

@@ -1,0 +1,66 @@
+meta {
+  name: update
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/songs/{{songId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Accept: application/json
+}
+
+body:json {
+  {
+    "title": "Gloire à Dieu",
+    "author": "Anonyme",
+    "reference": "CFF-001",
+    "notes": null,
+    "sections": [
+      {"id": {{sectionThreeId}}, "type": "couplet", "number": 1, "text": "Nous te louons, nous te bénissons"},
+      {"id": {{sectionOneId}}, "type": "couplet", "number": 2, "text": "Gloire à Dieu au plus haut des cieux\nPaix sur la terre aux hommes de bonne volonté"},
+      {"type": "pont", "text": "Amen, amen"}
+    ]
+  }
+}
+
+tests {
+  test("sections réordonnées, modifiées, ajoutée et supprimée", function () {
+    expect(res.status).to.equal(200);
+    const sections = res.body.data.sections;
+    expect(sections).to.have.length(3);
+    // Les sections reprises gardent leur identifiant, la nouvelle en reçoit un
+    expect(sections[0].id).to.equal(bru.getVar("sectionThreeId"));
+    expect(sections[1].id).to.equal(bru.getVar("sectionOneId"));
+    expect(sections[2].id).to.not.equal(bru.getVar("sectionTwoId"));
+    expect(sections.map((s) => s.position)).to.deep.equal([0, 1, 2]);
+    expect(sections[2].type).to.equal("pont");
+    // Les numéros sont ceux envoyés : après un réordonnancement, c'est le front qui renumérote, pas le back
+    expect(sections.map((s) => s.number)).to.deep.equal([1, 2, null]);
+  });
+}
+
+docs {
+  Modifie un cantique et ses sections (KAN-38) : un seul enregistrement, comme « Enregistrer le cantique ». Lancer d'abord
+  `songs/create` (`songId`, `sectionOneId`, `sectionTwoId`, `sectionThreeId`) avec un compte `admin` (403 sinon).
+
+  `sections` est la liste complète et ordonnée, comparée aux sections existantes :
+  - avec `id` : la section est mise à jour (l'`id` doit appartenir à ce cantique, 422 sinon, et ne peut apparaître qu'une fois) ;
+  - sans `id` : la section est créée ;
+  - section existante absente de la liste : supprimée (ici le refrain `sectionTwoId`).
+  La position de chaque section est son rang dans la liste : pour réordonner, renvoyer la liste dans un autre ordre.
+  Chaque section est remplacée en entier par ce qui est envoyé : sans `number`, la section n'a plus de numéro.
+
+  `sections` omis ou `null` : les sections existantes sont conservées. `sections: []` : toutes les sections sont supprimées.
+  Une section que l'ordre d'une messe utilise ne peut pas être supprimée : 422 sur `sections`, rien n'est enregistré (pas même le
+  titre). Elle peut être modifiée ou déplacée. Blocage à confirmer avec la présidente avant US-18.
+  Limites : 100 sections au plus, `text` de 5000 caractères au plus, `notes` de 2000 (422 sinon).
+}

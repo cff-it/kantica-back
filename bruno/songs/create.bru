@@ -1,0 +1,67 @@
+meta {
+  name: create
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/songs
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Accept: application/json
+}
+
+body:json {
+  {
+    "title": "Gloire à Dieu",
+    "author": "Anonyme",
+    "reference": "CFF-001",
+    "notes": null,
+    "sections": [
+      {"type": "couplet", "number": 1, "text": "Gloire à Dieu au plus haut des cieux\nPaix sur la terre aux hommes"},
+      {"type": "refrain", "text": "Alléluia, alléluia"},
+      {"type": "couplet", "number": 2, "text": "Nous te louons, nous te bénissons"}
+    ]
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar("songId", res.body.data.id);
+    bru.setVar("sectionOneId", res.body.data.sections[0].id);
+    bru.setVar("sectionTwoId", res.body.data.sections[1].id);
+    bru.setVar("sectionThreeId", res.body.data.sections[2].id);
+  }
+}
+
+tests {
+  test("cantique créé avec ses sections dans l'ordre saisi", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.data.sections).to.have.length(3);
+    expect(res.body.data.sections.map((s) => s.type)).to.deep.equal(["couplet", "refrain", "couplet"]);
+    expect(res.body.data.sections.map((s) => s.position)).to.deep.equal([0, 1, 2]);
+    // Numéros saisis, renvoyés tels quels : couplet 1, refrain sans numéro, couplet 2
+    expect(res.body.data.sections.map((s) => s.number)).to.deep.equal([1, null, 2]);
+    // Les retours à la ligne du texte sont conservés
+    expect(res.body.data.sections[0].text).to.contain("\n");
+  });
+}
+
+docs {
+  Ajoute un cantique avec ses sections (KAN-38). Lancer d'abord `auth/login` avec un compte `admin` (token `token`) : seul l'admin
+  peut ajouter ou modifier un cantique (403 sinon). Enregistre `songId` et l'identifiant de chaque section pour `update` et `show`.
+
+  `sections` : liste ordonnée `[{type, number?, text}]` ; l'ordre de la liste est l'ordre des sections (`position`, à partir de 0).
+  `type` : `couplet`, `refrain` ou `pont` (422 sinon). `text` : obligatoire, retours à la ligne conservés (un vers par ligne).
+  `number` : numéro saisi (Couplet 1, 2, 3), facultatif, entier de 1 à 999. La numérotation est manuelle : le back ne calcule rien,
+  ne contrôle pas l'unicité et ne renumérote pas.
+  Les sections sont facultatives : sans `sections`, le cantique est créé sans paroles.
+  `id` n'est pas accepté ici : un nouveau cantique n'a pas encore de section à reprendre.
+}

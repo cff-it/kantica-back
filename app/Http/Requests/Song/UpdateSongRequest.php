@@ -3,26 +3,27 @@
 namespace App\Http\Requests\Song;
 
 use App\DTOs\Song\UpdateSongDTO;
-use App\Models\Song;
-use Illuminate\Foundation\Http\FormRequest;
+use App\Repositories\SongRepository;
+use Illuminate\Validation\Rule;
 
-class UpdateSongRequest extends FormRequest
+class UpdateSongRequest extends SongRequest
 {
-    // Second contrôle du rôle (admin, SongPolicy::update), après celui de la route : défense en profondeur si la route
-    // perdait son `->can`. Avec la classe, sans charger le cantique
-    public function authorize(): bool
+    // Le cantique est lu ici, avant la validation, volontairement (une lecture par clé primaire) : un cantique inconnu donne
+    // un 404 même quand `sections` est invalide, au lieu d'un 422 de la règle `exists` sur des sections qui n'appartiennent
+    // à personne. Le rôle est déjà contrôlé avec la classe par la route, donc un non-admin reçoit un 403 avant tout 404.
+    public function authorize(SongRepository $songs): bool
     {
-        return $this->user()->can('update', Song::class);
+        return $this->user()->can('update', $songs->findById((int) $this->route('song')));
     }
 
-    public function rules(): array
+    // Une section envoyée avec son identifiant doit appartenir à ce cantique, sans apparaître deux fois
+    protected function sectionIdRules(): array
     {
         return [
-            'title'  => ['required', 'string', 'max:255'],
-            'author'    => ['nullable', 'string', 'max:255'],
-            'reference' => ['nullable', 'string', 'max:50'],
-            'lyrics'    => ['nullable', 'string'],
-            'notes'     => ['nullable', 'string'],
+            'nullable',
+            'integer',
+            'distinct',
+            Rule::exists('song_sections', 'id')->where('song_id', (int) $this->route('song')),
         ];
     }
 
@@ -33,8 +34,8 @@ class UpdateSongRequest extends FormRequest
             title: $this->input('title'),
             author: $this->input('author'),
             reference: $this->input('reference'),
-            lyrics: $this->input('lyrics'),
             notes: $this->input('notes'),
+            sections: $this->sections(),
         );
     }
 }

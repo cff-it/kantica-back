@@ -242,16 +242,16 @@ public function toDTO(): CheckInDTO
   (`create`, `update`, `delete` avec `RoleName::Admin` ; KAN-13 : « Un utilisateur non admin ne peut pas créer de
   cantique », modification « uniquement pour l'Admin »). Avant, un compte sans rôle pouvait lire chaque cantique, et tout
   compte validé pouvait en créer, modifier ou supprimer.
-- Défense en profondeur : `CreateSongRequest`, `UpdateSongRequest` et `DeleteSongRequest` contrôlent aussi le rôle
-  (`authorize()` avec la classe), après la route ; `SongPolicyTest` le vérifie hors des routes. `view`, `update` et
-  `delete` prennent le cantique en option (`?Song $song = null`), aucun droit n'en dépendant encore : appel par la classe
-  ici, avec le cantique dans les FormRequests de KAN-38 (PR de Kevin non fusionnée au 28 novembre 2026), qui réécrit
-  `CreateSongRequest` et `UpdateSongRequest` : garder sa version en cas de conflit. `SongPolicyTest` vérifie que les
-  deux appels donnent la même réponse.
+- Défense en profondeur : les FormRequests contrôlent aussi le rôle, après la route. `CreateSongRequest` et
+  `DeleteSongRequest` appellent la Policy avec la classe (`SongPolicyTest` le vérifie hors des routes) ;
+  `UpdateSongRequest` (KAN-38) charge le cantique de la route et l'appelle avec lui (couverte par
+  `SaveSongAuthorizationTest`). `view`, `update` et `delete` prennent donc le cantique en option (`?Song $song = null`),
+  aucun droit n'en dépendant encore ; `SongPolicyTest` vérifie que les deux appels donnent la même réponse.
 - Les routes `/{song}` limitent l'identifiant à 18 chiffres (`where` sur le groupe `songs`, `[0-9]{1,18}`, sous
   `PHP_INT_MAX`) : un identifiant non numérique ou trop grand donne un 404 au lieu d'une erreur 500 sur le paramètre
-  `int` du contrôleur (`whereNumber` laissait passer `99999999999999999999`). KAN-38 pose `whereNumber` sur ces lignes :
-  en cas de conflit, garder cette contrainte et `can`.
+  `int` du contrôleur (`whereNumber` laissait passer `99999999999999999999`). Cette contrainte remplace les
+  `whereNumber` de KAN-38 (rebase de sa branche sur `develop`, 28 novembre 2026) ; elle garantit aussi l'identifiant
+  que lit `UpdateSongRequest`.
 - Suppression : `DeleteSongAction` reçoit l'identifiant, lit le cantique une seule fois (404 s'il n'existe pas, pour
   l'admin) et le supprime par le modèle, pour que les événements Eloquent (et les sections de KAN-38) suivent ; une
   suppression directe par identifiant éviterait la lecture mais les court-circuiterait. Le rôle « responsable » que
@@ -271,6 +271,25 @@ public function toDTO(): CheckInDTO
   complète sous SQLite et sous PostgreSQL, appels réels sur la base de dev avec un compte membre (tri, recherche sans
   accents, compteur, 422, 401) et avec l'admin (suppressions 204, cantique inconnu 404, lecture d'un cantique 200).
   **Non vérifié** : la préprod Railway, où le jeu de démonstration n'a pas été chargé.
+
+### Sections d'un cantique (KAN-38)
+
+- Les sections (`SectionType` : `couplet`, `refrain`, `pont`) se saisissent avec le cantique : `sections: [{id?, type, number?, text}]`
+  sur `POST /api/songs` et `PUT /api/songs/{song}`. `SyncSongSectionsAction` aligne les sections sur la liste (crée sans `id`,
+  met à jour avec `id`, supprime les absentes), dans la transaction de `CreateSongAction` et `UpdateSongAction`. La position est
+  le rang dans la liste ; le numéro (Couplet 1, 2, 3) est saisi, facultatif, jamais calculé. À la modification, `sections` absent
+  ou `null` laisse les sections inchangées, `[]` les supprime toutes.
+- Une section utilisée dans l'ordre d'une messe (`mass_song_sections`) ne peut pas être supprimée (422, rien n'est enregistré) :
+  la cascade SQL la retirerait en silence de messes déjà préparées ou chantées. Choix à confirmer avec la présidente avant US-18.
+  Les sections sont verrouillées avant ce contrôle et le cantique l'est à la modification (`findByIdForUpdate`), pour que deux
+  modifications simultanées passent l'une après l'autre.
+- Bornes : 100 sections par cantique, 5000 caractères par texte de section, 2000 pour `notes`.
+- `GET /api/songs/{song}` ajoute `usage` : `ShowSongAction`, `SongUsageRepository` (jointures et tri en SQL, messes jusqu'à la
+  date du jour comprise) et `SongDetailResource`. `times_sung` compte toutes les utilisations, `history` garde les 50 plus
+  récentes. La liste, l'ajout et la modification ne renvoient pas `usage`.
+- `Song` et `SongSection` ciblent la colonne `uuid` (`uniqueIds()`) : `HasUuids` visait sinon la clé `id`, entière. Huit autres
+  modèles ont le même défaut (`Libretto`, `Prayer`, `UserPayment`, `SongLibretto`, `LinkType`, `MassPart`, `SongLink`,
+  `SongTheme`), non corrigé ici.
 
 ## Conventions de nommage
 

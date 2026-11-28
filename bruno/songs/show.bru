@@ -1,0 +1,63 @@
+meta {
+  name: show
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/songs/{{songId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("cantique avec ses sections numérotées", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data.id).to.equal(bru.getVar("songId"));
+    expect(res.body.data.sections).to.be.an("array");
+    res.body.data.sections.forEach((section) => {
+      expect(section.type).to.be.oneOf(["couplet", "refrain", "pont"]);
+      expect(section.text).to.be.a("string");
+      expect(section.number === null || Number.isInteger(section.number)).to.equal(true);
+    });
+  });
+
+  test("historique d'usage du cantique", function () {
+    const usage = res.body.data.usage;
+    // `history` ne garde que les 50 utilisations les plus récentes, `times_sung` les compte toutes
+    expect(usage.times_sung).to.be.at.least(usage.history.length);
+    expect(usage.history.length).to.be.at.most(50);
+    expect(usage.last_sung).to.deep.equal(usage.history[0] ?? null);
+    usage.history.forEach((use, index) => {
+      expect(use.date).to.match(/^\d{4}-\d{2}-\d{2}$/);
+      expect(use.part).to.be.a("string");
+      expect(use.occasion === null || typeof use.occasion === "string").to.equal(true);
+      if (index > 0) {
+        expect(use.date <= usage.history[index - 1].date).to.equal(true);
+      }
+    });
+  });
+}
+
+docs {
+  Consulte un cantique avec ses sections dans l'ordre de saisie. `number` est le numéro saisi par l'admin (Couplet 1, 2, 3), ou
+  `null` s'il n'y en a pas : il n'est pas calculé. Le libellé « Couplet 2 » est composé par le front. La liste `GET /songs` ne
+  renvoie ni les sections ni l'historique d'usage.
+
+  `usage` aide à choisir les cantiques d'une messe (éviter les répétitions, équilibrer le répertoire) :
+  - `times_sung` : nombre de fois où le cantique a été chanté (un cantique chanté deux fois dans la même messe compte deux fois) ;
+  - `last_sung` : la dernière fois (`mass_id`, `date`, `occasion`, `part`), ou `null` s'il n'a jamais été chanté ;
+  - `history` : les 50 utilisations les plus récentes, de la plus récente à la plus ancienne ; `last_sung` en est le premier élément.
+
+  `date` est celle de la messe (`2026-11-15`), `occasion` son nom liturgique (`null` s'il n'est pas renseigné) et `part` la partie
+  de la messe (Entrée, Communion...). Seules les messes déjà célébrées comptent (date du jour comprise) : une messe préparée pour
+  plus tard n'est pas comptée.
+}

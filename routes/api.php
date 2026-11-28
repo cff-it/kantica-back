@@ -83,8 +83,8 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
         Route::get('/', [SongController::class, 'index'])
             ->can('viewAny', Song::class);
         // Chaque route contrôle le rôle elle-même, avec la classe (403 avant tout 404) : lecture pour les trois rôles,
-        // ajout, modification et suppression pour l'admin (KAN-13). Avant, tout compte validé pouvait écrire ; les
-        // FormRequests de KAN-38 contrôleront aussi le cantique, à unifier à leur fusion
+        // ajout, modification et suppression pour l'admin (KAN-13). Avant, tout compte validé pouvait écrire. Les
+        // FormRequests le vérifient aussi (UpdateSongRequest avec le cantique, lu grâce à la contrainte de `{song}`)
         Route::post('/', [SongController::class, 'store'])
             ->can('create', Song::class);
         // Un cantique se lit avec le même droit que la liste : un compte sans rôle reçoit un 403, avant tout 404

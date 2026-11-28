@@ -24,6 +24,18 @@ class SongRepository
         return Song::findOrFail($id);
     }
 
+    // À appeler dans une transaction : deux modifications du même cantique passent l'une après l'autre, la seconde lit
+    // les sections après l'enregistrement de la première (sans verrou, leurs positions pourraient s'entrelacer)
+    public function findByIdForUpdate(int $id): Song
+    {
+        return Song::lockForUpdate()->findOrFail($id);
+    }
+
+    public function findWithSections(int $id): Song
+    {
+        return Song::with('sections')->findOrFail($id);
+    }
+
     public function create(array $data): Song
     {
         return Song::create($data);
