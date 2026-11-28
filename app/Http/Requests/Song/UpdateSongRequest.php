@@ -8,6 +8,9 @@ use Illuminate\Validation\Rule;
 
 class UpdateSongRequest extends SongRequest
 {
+    // Le cantique est lu ici, avant la validation, volontairement (une lecture par clé primaire) : un cantique inconnu donne
+    // un 404 même quand `sections` est invalide, au lieu d'un 422 de la règle `exists` sur des sections qui n'appartiennent
+    // à personne. Le rôle est déjà contrôlé avec la classe par la route, donc un non-admin reçoit un 403 avant tout 404.
     public function authorize(SongRepository $songs): bool
     {
         return $this->user()->can('update', $songs->findById((int) $this->route('song')));

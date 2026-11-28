@@ -10,7 +10,9 @@ use Illuminate\Validation\ValidationException;
 // Aligne les sections du cantique sur la liste reçue (liste complète et ordonnée) : crée les sections sans identifiant,
 // met à jour celles dont l'identifiant est connu, supprime les autres. La position d'une section est son rang dans la
 // liste, de sorte que réordonner revient à renvoyer la liste dans un autre ordre.
-// Plusieurs écritures : à appeler dans une transaction.
+// Plusieurs écritures : à appeler dans une transaction, avec un cantique que personne d'autre ne modifie en même temps.
+// UpdateSongAction le verrouille (`findByIdForUpdate`) ; CreateSongAction vient de le créer dans la même transaction, donc
+// aucune autre requête ne peut encore le cibler. Sans cela, la liste des sections lues ci-dessous pourrait être périmée.
 //
 // Une section utilisée dans l'ordre d'une messe (`mass_song_sections`, US-18) ne peut pas être supprimée : la cascade SQL
 // effacerait en silence une partie du programme de messes préparées ou déjà chantées. Elle peut en revanche être modifiée
