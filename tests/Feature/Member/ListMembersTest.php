@@ -227,6 +227,17 @@ class ListMembersTest extends TestCase
         $this->getJson('/api/members?page=0')->assertUnprocessable()->assertJsonValidationErrors(['page',]);
     }
 
+    // Sans borne haute, PHP_INT_MAX passait la validation et le calcul du décalage de la page finissait en erreur 500
+    public function test_a_huge_page_is_refused_instead_of_failing(): void
+    {
+        Sanctum::actingAs($this->secretary);
+
+        $this->getJson('/api/members?page=100000')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/members?page='.PHP_INT_MAX)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['page' => 'La page demandée est trop grande.',]);
+    }
+
     public function test_the_original_admin_account_is_not_a_member(): void
     {
         config(['kantica.super_admin.mail' => 'root@kantica.test',]);

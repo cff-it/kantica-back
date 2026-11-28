@@ -182,7 +182,7 @@ public function toDTO(): CheckInDTO
 |---|---|
 | **Répertoire chants** | `CreateSong`, `UpdateSong`, `AttachSongToMass` |
 | **Liturgie messes** | `CreateMass`, `AssignSongToMassPart`, `GeneratePptx` |
-| **Membres & rôles** | `CreateUser`, `AssignRole`, `AssignMassRole`, `AssignVoiceAction` (`PUT /api/members/{member}/voice`, KAN-34 : voix seule, 422 sans fiche, voix précise effacée si le groupe change) |
+| **Membres & rôles** | `ListMembersAction` (`GET /api/members?search=&voice=&page=`, 20 par page, `page` bornée à 100 000 comme la liste des rôles : voir « Rôles (KAN-35) »), `CreateUser`, `AssignRole`, `AssignMassRole`, `AssignVoiceAction` (`PUT /api/members/{member}/voice`, KAN-34 : voix seule, 422 sans fiche, voix précise effacée si le groupe change) |
 | **Événements** | `CreateEvent`, `RegisterMember`, `CheckInMember` |
 | **Paiements** | `CreateEventPayment`, `RecordUserPayment` |
 
@@ -192,6 +192,12 @@ public function toDTO(): CheckInDTO
 
 - « Gestion des rôles » (US-25) : `ListUsersWithRolesAction` (`GET /api/users?search=&page=`, 20 par page, rôle de
   chaque compte et `meta.role_counts`) et `AssignRoleAction` (`PUT /api/users/{user}/role`, `{ role }`).
+- `page` est bornée à 100 000 dans `ListUsersRequest` et `ListMembersRequest` (422 « La page demandée est trop
+  grande. »), comme `ListSongsRequest` : sans borne, `PHP_INT_MAX` passait la validation et le décalage de la page
+  (`forPage`, `array_slice`) n'était plus un entier, d'où une erreur 500. **Vérifié** : `ManageRolesTest` et
+  `ListMembersTest` (page 100 000 vide, `PHP_INT_MAX` refusée ; ces tests finissaient en 500 avant la borne), sous
+  SQLite et PostgreSQL, et contre le back de dev (les deux routes). `ListUsersImportsRequest` (historique des imports,
+  paginé en SQL) n'a pas encore cette borne : non traité ici.
 - La fiche membre (`GET /api/members/{id}`, `UserRepository::findRecordById`) renvoie aussi `roles` : la
   secrétaire voit le rôle, seul l'admin peut le changer (front : ligne « Rôle » de la fiche).
 - Trois rôles Spatie (`RoleName` : `admin`, `secretaire`, `membre`), créés par `SyncRolesAction` (`RoleSeeder`,

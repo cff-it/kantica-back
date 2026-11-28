@@ -91,6 +91,17 @@ class ManageRolesTest extends TestCase
         $this->getJson('/api/users?page=2')->assertJsonCount(2, 'data');
     }
 
+    // Sans borne haute, PHP_INT_MAX passait la validation et le calcul du décalage de la page finissait en erreur 500
+    public function test_a_huge_page_is_refused_instead_of_failing(): void
+    {
+        Sanctum::actingAs($this->member('Andriamanana', 'Feno', 'T', role: RoleName::Admin));
+
+        $this->getJson('/api/users?page=100000')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/users?page='.PHP_INT_MAX)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['page' => 'La page demandée est trop grande.',]);
+    }
+
     public function test_the_original_admin_account_is_not_listed(): void
     {
         config(['kantica.super_admin.mail' => 'admin@kantica.test',]);

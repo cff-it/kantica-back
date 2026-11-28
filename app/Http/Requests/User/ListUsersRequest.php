@@ -17,7 +17,8 @@ class ListUsersRequest extends FormRequest
     {
         return [
             'search' => ['nullable', 'string', 'max:100',],
-            'page'   => ['nullable', 'integer', 'min:1',],
+            // Borne haute : au-delà de PHP_INT_MAX / 20, le décalage de la page n'est plus un entier (erreur 500)
+            'page'   => ['nullable', 'integer', 'min:1', 'max:100000',],
         ];
     }
 
@@ -25,6 +26,7 @@ class ListUsersRequest extends FormRequest
     {
         return [
             'page.min' => 'La page doit être supérieure ou égale à 1.',
+            'page.max' => 'La page demandée est trop grande.',
         ];
     }
 
