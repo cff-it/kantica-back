@@ -183,7 +183,7 @@ public function toDTO(): CheckInDTO
 | **Répertoire chants** | `CreateSong`, `UpdateSong`, `AttachSongToMass`, `ListSongsAction` (`GET /api/songs`, KAN-18 : recherche par titre ou auteur, 20 par page), `DeleteSongAction` (`DELETE /api/songs/{song}`, admin) |
 | **Liturgie messes** | `CreateMass`, `AssignSongToMassPart`, `GeneratePptx` |
 | **Membres & rôles** | `ListMembersAction` (`GET /api/members?search=&voice=&page=`, 20 par page, `page` bornée à 100 000 comme la liste des rôles : voir « Rôles (KAN-35) »), `CreateUser`, `AssignRole`, `AssignMassRole`, `AssignVoiceAction` (`PUT /api/members/{member}/voice`, KAN-34 : voix seule, 422 sans fiche, voix précise effacée si le groupe change) |
-| **Événements** | `CreateEvent`, `RegisterMember`, `CheckInMember` |
+| **Événements** | `CreateEvent`, `RegisterMember`, `CheckInMember`, `ListEventAttendancesAction` (`GET /api/events/{event}/attendances`, KAN-12 : liste de saisie des présences), `RecordAttendancesAction` (`PUT /api/events/{event}/attendances`, KAN-12 : liste complète des présents, synchronisée) |
 | **Paiements** | `CreateEventPayment`, `RecordUserPayment` |
 
 ---
@@ -290,6 +290,44 @@ public function toDTO(): CheckInDTO
 - `Song` et `SongSection` ciblent la colonne `uuid` (`uniqueIds()`) : `HasUuids` visait sinon la clé `id`, entière. Huit autres
   modèles ont le même défaut (`Libretto`, `Prayer`, `UserPayment`, `SongLibretto`, `LinkType`, `MassPart`, `SongLink`,
   `SongTheme`), non corrigé ici.
+
+### Présences (KAN-12)
+
+- Saisie des présences d'un événement (US-11) : `ListEventAttendancesAction` (`GET /api/events/{event}/attendances`) et
+  `RecordAttendancesAction` (`PUT /api/events/{event}/attendances`, `{ present_member_ids: number[] }`). Les deux
+  réponses ont le même format (`EventAttendanceResource`) : `data.event` (`id`, `name`, `date_start`), `present_count`,
+  `total_count` (« 5 / 9 présents ») et `members` (`id`, `last_name`, `first_name`, `voice_group`, `voice`, `present`).
+- Accès : **Secrétaire et Admin** (`EventPolicy::manageAttendances`, appelée avec la classe sur la route : 403 avant tout
+  404 ; `RecordAttendancesRequest` le vérifie aussi). `{event}` est limité à 18 chiffres (`where`, comme `{song}`) : un
+  identifiant non numérique ou trop grand donne un 404.
+- Modèle : la table `event_checks` du MCD (`EventCheck`) porte la présence, sans nouvelle table. La migration
+  `2026_11_28_000000` ajoute l'unicité (`event_id`, `user_id`), après avoir réduit les doublons éventuels à la première
+  ligne. `date_in` est l'heure de la première coche, `date_out` reste nul, et une présence maintenue n'est jamais
+  réécrite.
+- Lecture : tous les membres **actifs** (`MemberRepository::allActive()`), sans les comptes en attente ni le compte
+  administrateur originel, triés comme la liste des membres (`MemberSortKey`, partagé avec `ListMembersAction`).
+  `present_count` ne compte que les membres listés, pour ne jamais dépasser `total_count`.
+- Enregistrement : le front envoie la liste complète des présents. Synchronisation dans une transaction : présences
+  manquantes ajoutées, présences décochées supprimées. Idempotente, `[]` décoche tout. Le verrou (ligne de l'événement,
+  `findForUpdate`) est pris **avant** de lire les présences : deux saisies simultanées passent l'une après l'autre. SQLite
+  l'ignore : `EventAttendancesTest` vérifie la requête `FOR UPDATE` quand la suite tourne sous PostgreSQL (CI).
+- Seuls les membres actifs de la liste sont concernés : un identifiant inconnu, d'un compte en attente ou de
+  l'administrateur originel donne un 422 sur `present_member_ids` et rien n'est écrit ; une présence d'un compte hors
+  liste n'est jamais supprimée. Un identifiant en double donne un 422 (`distinct`), 1000 identifiants au plus.
+- `CheckInMemberAction` (`POST /api/events/{event}/check-in`) refuse maintenant toute présence existante, sortie
+  enregistrée ou non : avec la contrainte d'unicité, un second pointage après `date_out` donnerait une erreur 500.
+- Points du ticket tranchés par défaut, à confirmer avec la présidente : comptes en attente absents de la liste (le
+  ticket parle de « membres actifs »), saisie corrigeable à tout moment (le `PUT` est idempotent), saisie réservée à la
+  Secrétaire et à l'Admin. Restent ouverts : pointage par le membre lui-même, absences excusées, sélection de
+  l'événement côté front.
+- Hors périmètre : la création des événements n'est couverte par aucune story. `POST /api/events` et
+  `POST /api/events/{event}/check-in` n'ont aucun contrôle de rôle, et `EventPolicy` cite un rôle « responsable » qui
+  n'existe pas (règle effective inchangée).
+- Requêtes Bruno `events/attendances-get` et `events/attendances-put`.
+- **Vérifié** : `EventAttendancesTest` (35 tests : lecture, tri, comptes exclus, droits, 403 avant 404, identifiants
+  invalides, première saisie, correction, idempotence, liste vide, contrainte d'unicité, migration des doublons) et
+  `CheckInMemberTest`, suite complète sous SQLite (744 réussis). **Non vérifié** : PostgreSQL (verrou `FOR UPDATE`,
+  migration), laissé à la CI ; appels réels sur le back de dev.
 
 ## Conventions de nommage
 
