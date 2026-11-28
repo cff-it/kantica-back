@@ -184,6 +184,22 @@ class ListUsersImportsTest extends TestCase
             ->assertJsonPath('data.0.id', $imports->first()->id);
     }
 
+    // Sans borne haute, le décalage d'une page démesurée (un flottant) était converti en entier modulo 2^64 : avec
+    // PHP_INT_MAX, il valait 0 et la réponse donnait les premiers imports au lieu d'une page vide
+    public function test_a_huge_page_is_refused_instead_of_returning_the_first_imports(): void
+    {
+        $this->importOf($this->secretary);
+        Sanctum::actingAs($this->secretary);
+
+        $this->getJson('/api/users/import?page=100000')->assertOk()->assertJsonCount(0, 'data');
+
+        foreach ([100001, PHP_INT_MAX,] as $page) {
+            $this->getJson('/api/users/import?page='.$page)
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors(['page' => 'La page demandée est trop grande.',]);
+        }
+    }
+
     #[DataProvider('invalidPages')]
     public function test_an_invalid_page_is_refused(string $page): void
     {

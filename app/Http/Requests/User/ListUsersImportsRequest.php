@@ -16,7 +16,9 @@ class ListUsersImportsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'page' => ['nullable', 'integer', 'min:1',],
+            // Borne haute : au-delà de PHP_INT_MAX / 20, le décalage de la page n'est plus un entier et sa conversion
+            // donne une page arbitraire (les premiers imports pour PHP_INT_MAX)
+            'page' => ['nullable', 'integer', 'min:1', 'max:100000',],
         ];
     }
 
@@ -25,6 +27,7 @@ class ListUsersImportsRequest extends FormRequest
         return [
             'page.integer' => 'La page doit être un nombre entier.',
             'page.min'     => 'La page doit être supérieure ou égale à 1.',
+            'page.max'     => 'La page demandée est trop grande.',
         ];
     }
 
