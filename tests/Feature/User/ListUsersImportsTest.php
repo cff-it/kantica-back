@@ -192,9 +192,12 @@ class ListUsersImportsTest extends TestCase
         Sanctum::actingAs($this->secretary);
 
         $this->getJson('/api/users/import?page=100000')->assertOk()->assertJsonCount(0, 'data');
-        $this->getJson('/api/users/import?page='.PHP_INT_MAX)
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['page' => 'La page demandée est trop grande.',]);
+
+        foreach ([100001, PHP_INT_MAX,] as $page) {
+            $this->getJson('/api/users/import?page='.$page)
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors(['page' => 'La page demandée est trop grande.',]);
+        }
     }
 
     #[DataProvider('invalidPages')]

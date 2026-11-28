@@ -193,10 +193,10 @@ public function toDTO(): CheckInDTO
 - « Gestion des rôles » (US-25) : `ListUsersWithRolesAction` (`GET /api/users?search=&page=`, 20 par page, rôle de
   chaque compte et `meta.role_counts`) et `AssignRoleAction` (`PUT /api/users/{user}/role`, `{ role }`).
 - `page` est bornée à 100 000 dans `ListUsersRequest` et `ListMembersRequest` (422 « La page demandée est trop
-  grande. »), comme `ListSongsRequest` : sans borne, `PHP_INT_MAX` passait la validation et le décalage de la page
-  (`forPage`, `array_slice`) n'était plus un entier, d'où une erreur 500. **Vérifié** : `ManageRolesTest` et
-  `ListMembersTest` (page 100 000 vide, `PHP_INT_MAX` refusée ; ces tests finissaient en 500 avant la borne), sous
-  SQLite et PostgreSQL, et contre le back de dev (les deux routes).
+  grande. »), comme la liste du répertoire (KAN-18, pas encore dans `develop`) : sans borne, `PHP_INT_MAX` passait la
+  validation et le décalage de la page (`forPage`, `array_slice`) n'était plus un entier, d'où une erreur 500.
+  **Vérifié** : `ManageRolesTest` et `ListMembersTest` (page 100 000 vide, 100 001 et `PHP_INT_MAX` refusées ; ces
+  tests finissaient en 500 avant la borne), sous SQLite et PostgreSQL, et contre le back de dev (les deux routes).
 - Même borne pour l'historique des imports (`ListUsersImportsRequest`, `GET /api/users/import?page=`, paginé en SQL).
   Sans elle, pas d'erreur 500 : le Query Builder convertit le décalage (un flottant) en entier, modulo 2^64, donc la
   page renvoyée était arbitraire ; avec `PHP_INT_MAX`, le décalage valait 0 et la réponse donnait les premiers
