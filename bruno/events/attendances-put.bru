@@ -36,9 +36,12 @@ tests {
 docs {
   Enregistre les présences d'un événement (KAN-12, US-11) : le body est la liste complète des identifiants présents
   (`present_member_ids`). Lancer d'abord `login-secretary` (token `secretaryToken`), `auth/register` (`memberId`) puis
-  `members/validate` : seuls les membres actifs peuvent être marqués présents (422 sinon, rien n'est enregistré).
+  `members/validate` : les membres actifs et les comptes en attente peuvent être marqués présents ; un identifiant inconnu
+  ou celui du compte administrateur originel donne un 422 et rien n'est enregistré.
 
   Les présences de l'événement sont synchronisées dans une transaction : les membres absents de la liste sont décochés,
   les autres ajoutés. L'appel est idempotent, et `[]` décoche tout le monde. Un identifiant en double donne un 422.
+  Chaque enregistrement réussi, même à 0 présent, pose la date de saisie de l'événement (il passe en « Déjà saisis » dans
+  `attendance-overview`). 422 (clé `event`) avant le jour de l'événement.
   La réponse a le même format que `attendances-get`. 403 pour un compte `membre`, 404 pour un événement inconnu.
 }

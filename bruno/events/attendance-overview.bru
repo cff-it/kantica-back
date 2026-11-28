@@ -1,0 +1,50 @@
+meta {
+  name: attendance-overview
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/events/attendance-overview
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~type: messe
+  ~page: 1
+}
+
+headers {
+  Accept: application/json
+}
+
+tests {
+  test("trois groupes et leurs décomptes", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data.to_record).to.be.an("array");
+    expect(res.body.data.upcoming).to.be.an("array");
+    expect(res.body.data.recorded).to.be.an("array");
+    expect(res.body.meta.counts.to_record).to.be.a("number");
+    expect(res.body.meta.counts.upcoming).to.be.a("number");
+    expect(res.body.meta.counts.recorded).to.be.a("number");
+    expect(res.body.meta.per_page).to.equal(20);
+  });
+}
+
+docs {
+  Écran de choix de l'événement des présences (KAN-12). Lancer d'abord `login-secretary` (token `secretaryToken`).
+  Secrétaire et Admin : 403 pour un compte `membre` ou sans rôle, 401 sans token.
+
+  `data.to_record` : événements passés ou du jour sans saisie, du plus récent au plus ancien (« À saisir »).
+  `data.upcoming` : les 10 prochains événements après aujourd'hui, du plus proche au plus lointain (« À venir »).
+  `data.recorded` : événements dont la saisie est posée (même à 0 présent), du plus récent, 20 par page (« Déjà saisis »).
+  Le jour se lit à l'heure de la chorale (Indian/Antananarivo, UTC+3).
+
+  Chaque élément : `id`, `name`, `type`, `date_start` (UTC), `location` ; `recorded` ajoute `present_count` et `total`
+  (« 8 / 9 présents »). `meta.counts` donne le total de chaque groupe (pastilles), `meta.page`, `meta.per_page` et
+  `meta.last_page` la pagination de `recorded`.
+
+  Paramètres (désactivés par défaut) : `type` (`repetition`, `messe`, `concert`, `autre` ; sans lui, tous les types, 422 si
+  inconnu) filtre les trois groupes et les décomptes ; `page` (1 à 100 000) ne déplace que `recorded`.
+}

@@ -1,0 +1,56 @@
+meta {
+  name: create
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/events
+  body: json
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+}
+
+body:json {
+  {
+    "type": "repetition",
+    "name": "Répétition",
+    "date_start": "2026-12-05 17:00:00",
+    "location": "Salle paroissiale"
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar("createdEventId", res.body.data.id);
+  }
+}
+
+tests {
+  test("événement créé avec son type et son lieu", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.data.type).to.equal("repetition");
+    expect(res.body.data.location).to.equal("Salle paroissiale");
+    // 17 h à Antananarivo (UTC+3) : la base et la réponse sont en UTC
+    expect(res.body.data.date_start).to.equal("2026-12-05T14:00:00+00:00");
+  });
+}
+
+docs {
+  Crée un événement (KAN-12, formulaire « Nouvel événement »). Lancer d'abord `login-secretary` (token `secretaryToken`).
+  Réservé à la Secrétaire et à l'Admin : 403 pour un compte `membre` ou sans rôle, 401 sans token.
+
+  Champs : `type` (`repetition`, `messe`, `concert` ou `autre`), `name` (intitulé, prérempli par le front) et `date_start`
+  sont obligatoires ; `location` (255 caractères au plus), `date_end` (après `date_start`), `need_payment` et
+  `payment_amount` sont facultatifs. 422 en français sinon.
+
+  Une date **sans décalage** (« 2026-12-05 17:00:00 ») se lit à l'heure de la chorale (Indian/Antananarivo, UTC+3) et
+  est enregistrée en UTC (14 h) ; avec un décalage (« 2026-12-05T17:00:00+03:00 », « …Z »), il est respecté. Les réponses
+  sont en UTC.
+
+  Après la création, `createdEventId` contient l'identifiant : le mettre dans `eventId` de `attendances-get` et
+  `attendances-put`. Les présences se saisissent à partir du jour de l'événement (422 avant).
+}
