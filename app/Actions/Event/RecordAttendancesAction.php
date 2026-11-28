@@ -13,7 +13,8 @@ use Illuminate\Validation\ValidationException;
  * Enregistre les présences d'un événement (US-11) : le front envoie la liste complète des présents, et la base est
  * synchronisée dans une transaction (présences manquantes ajoutées, présences décochées supprimées). L'appel est
  * idempotent : le renvoyer, ou envoyer une liste corrigée, ne crée jamais de doublon. La contrainte d'unicité
- * (événement, membre) garantit en base qu'un membre n'est présent qu'une fois.
+ * (événement, membre) garantit en base qu'un membre n'est présent qu'une fois. Le pointage (CheckInMemberAction) prend
+ * le même verrou, et l'écriture en bloc ignore une présence déjà écrite : une course ne fait pas échouer la saisie.
  *
  * Seuls les membres actifs de la liste de saisie sont concernés : un identifiant inconnu ou d'un compte en attente est
  * refusé, et une présence d'un compte hors liste n'est jamais supprimée.

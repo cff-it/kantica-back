@@ -315,7 +315,10 @@ public function toDTO(): CheckInDTO
   l'administrateur originel donne un 422 sur `present_member_ids` et rien n'est écrit ; une présence d'un compte hors
   liste n'est jamais supprimée. Un identifiant en double donne un 422 (`distinct`), 1000 identifiants au plus.
 - `CheckInMemberAction` (`POST /api/events/{event}/check-in`) refuse maintenant toute présence existante, sortie
-  enregistrée ou non : avec la contrainte d'unicité, un second pointage après `date_out` donnerait une erreur 500.
+  enregistrée ou non : avec la contrainte d'unicité, un second pointage après `date_out` donnerait une erreur 500. Il
+  prend le même verrou que la saisie (`findForUpdate`, dans une transaction, avant de chercher le doublon) et convertit
+  une violation d'unicité en 422 ; `addAttendances` écrit en `insertOrIgnore`. **Toute écriture dans `event_checks` doit
+  prendre ce verrou** : sinon une course avec la saisie donnerait une erreur 500.
 - Points du ticket tranchés par défaut, à confirmer avec la présidente : comptes en attente absents de la liste (le
   ticket parle de « membres actifs »), saisie corrigeable à tout moment (le `PUT` est idempotent), saisie réservée à la
   Secrétaire et à l'Admin. Restent ouverts : pointage par le membre lui-même, absences excusées, sélection de
@@ -324,9 +327,10 @@ public function toDTO(): CheckInDTO
   `POST /api/events/{event}/check-in` n'ont aucun contrôle de rôle, et `EventPolicy` cite un rôle « responsable » qui
   n'existe pas (règle effective inchangée).
 - Requêtes Bruno `events/attendances-get` et `events/attendances-put`.
-- **Vérifié** : `EventAttendancesTest` (35 tests : lecture, tri, comptes exclus, droits, 403 avant 404, identifiants
-  invalides, première saisie, correction, idempotence, liste vide, contrainte d'unicité, migration des doublons) et
-  `CheckInMemberTest`, suite complète sous SQLite (744 réussis). **Non vérifié** : PostgreSQL (verrou `FOR UPDATE`,
+- **Vérifié** : `EventAttendancesTest` (36 tests : lecture, tri, comptes exclus, droits, 403 avant 404, identifiants
+  invalides, première saisie, correction, idempotence, liste vide, présence écrite entre la lecture et l'écriture,
+  contrainte d'unicité, migration des doublons) et `CheckInMemberTest` (4 tests : doublon, pointage après une sortie,
+  verrou pris dans une transaction avant le doublon, course convertie en 422), suite complète sous SQLite (747 réussis). **Non vérifié** : PostgreSQL (verrou `FOR UPDATE`,
   migration), laissé à la CI ; appels réels sur le back de dev.
 
 ## Conventions de nommage

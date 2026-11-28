@@ -26,7 +26,8 @@ class EventRepository
         return Event::findOrFail($id);
     }
 
-    // Verrouille la ligne de l'événement jusqu'à la fin de la transaction : deux saisies simultanées passent l'une après l'autre
+    // Verrouille la ligne de l'événement jusqu'à la fin de la transaction. Toute écriture dans `event_checks` (saisie des
+    // présences, pointage) le prend : deux écritures simultanées sur un même événement passent l'une après l'autre
     public function findForUpdate(int $id): Event
     {
         return Event::lockForUpdate()->findOrFail($id);
@@ -63,7 +64,9 @@ class EventRepository
             return;
         }
 
-        EventCheck::insert(array_map(fn (int $userId) => [
+        // insertOrIgnore : une présence déjà écrite (par un chemin qui ne prend pas le verrou) donne le résultat voulu,
+        // elle ne doit pas faire échouer toute la saisie
+        EventCheck::insertOrIgnore(array_map(fn (int $userId) => [
             'event_id'   => $eventId,
             'user_id'    => $userId,
             'date_in'    => $dateIn,

@@ -7,6 +7,7 @@ use App\Enums\UserStatus;
 use App\Models\Event;
 use App\Models\EventCheck;
 use App\Models\User;
+use App\Repositories\EventRepository;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\VoiceSeeder;
 use Illuminate\Database\QueryException;
@@ -419,6 +420,34 @@ class EventAttendancesTest extends TestCase
         $this->putJson("/api/events/{$event->id}/attendances", ['present_member_ids' => [$hanta->id,],])->assertOk();
 
         $this->assertNotEmpty(array_filter($queries, fn (string $sql) => str_contains(strtolower($sql), 'for update')));
+    }
+
+    public function test_a_presence_written_between_the_read_and_the_write_does_not_break_the_recording(): void
+    {
+        $event = $this->event();
+        $hanta = $this->member('Rasoanaivo', 'Hanta');
+        $this->markPresent($event, $hanta);
+        $kept = EventCheck::where('event_id', $event->id)->first();
+
+        // Première lecture périmée : elle ne voit pas la présence qu'un pointage vient d'écrire
+        $this->app->instance(EventRepository::class, new class extends EventRepository
+        {
+            private int $reads = 0;
+
+            public function presentUserIds(int $eventId): array
+            {
+                return $this->reads++ === 0 ? [] : parent::presentUserIds($eventId);
+            }
+        });
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $this->putJson("/api/events/{$event->id}/attendances", ['present_member_ids' => [$hanta->id,],])
+            ->assertOk()
+            ->assertJsonPath('data.present_count', 1);
+
+        // Aucun doublon, et la présence déjà écrite n'est pas réécrite
+        $this->assertSame(1, EventCheck::where('event_id', $event->id)->count());
+        $this->assertSame($kept->id, EventCheck::where('event_id', $event->id)->value('id'));
     }
 
     // ── Base de données ─────────────────────────────────────────────────────
