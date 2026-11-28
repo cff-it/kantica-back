@@ -1,0 +1,46 @@
+meta {
+  name: list
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/songs
+  body: none
+  auth: bearer
+}
+
+params:query {
+  ~search: adeste
+  ~page: 2
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Accept: application/json
+}
+
+docs {
+  Répertoire (KAN-18, US-04) : tout compte validé qui a un rôle (membre, secrétaire ou admin ; 403 sinon). Lancer d'abord
+  `auth/login`, qui range le jeton dans `token`. Cantiques de démonstration (les 13 de la maquette) :
+  `php artisan db:seed --class=SongReferenceSeeder`.
+
+  - `search` : titre ou auteur, sans tenir compte de la casse ni des accents ; plusieurs mots = tous doivent correspondre.
+    La référence et les paroles ne sont pas cherchées (champ « Titre ou auteur » de la maquette)
+  - `page` : numéro de page, 1 par défaut ; 20 cantiques par page, triés par titre (sans casse ni accents)
+  - `data[]` : une ligne au format de `SongListItemResource` (`id`, `title`, `author`, `reference`) ; le cantique complet
+    (notes, sections, historique d'usage) est servi par `show`
+  - `meta.total` suit la recherche ; `meta.songs_count` (« 13 cantiques ») porte sur tout le répertoire
+}
+
+tests {
+  test("répertoire renvoyé avec le nombre de cantiques", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.data).to.be.an("array");
+    expect(res.body.meta.songs_count).to.be.a("number");
+    expect(res.body.meta.per_page).to.equal(20);
+  });
+}

@@ -10,6 +10,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SongController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserImportController;
+use App\Models\Song;
 use App\Models\User;
 use App\Models\UserProfile;
 use Illuminate\Support\Facades\Route;
@@ -75,7 +76,9 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
 
     // ── Répertoire chants ───────────────────────────────────────────────
     Route::prefix('songs')->group(function () {
-        Route::get('/', [SongController::class, 'index']);
+        // Répertoire (KAN-18, US-04) : `?search=` (titre ou auteur) et `?page=`
+        Route::get('/', [SongController::class, 'index'])
+            ->can('viewAny', Song::class);
         Route::post('/', [SongController::class, 'store']);
         Route::get('/{song}', [SongController::class, 'show']);
         Route::put('/{song}', [SongController::class, 'update']);

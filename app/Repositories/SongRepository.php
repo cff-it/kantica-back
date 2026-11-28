@@ -12,6 +12,13 @@ class SongRepository
         return Song::orderBy('title')->get();
     }
 
+    // Répertoire (US-04) : les seules colonnes affichées par la liste, sans tri SQL (ListSongsAction trie en PHP, sans
+    // casse ni accents)
+    public function allForList(): Collection
+    {
+        return Song::query()->select(['id', 'title', 'author', 'reference',])->get();
+    }
+
     public function findById(int $id): Song
     {
         return Song::findOrFail($id);
