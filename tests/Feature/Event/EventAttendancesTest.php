@@ -91,7 +91,8 @@ class EventAttendancesTest extends TestCase
         $this->assertNotContains(true, $response->json('data.members.*.present'));
     }
 
-    public function test_pending_accounts_and_the_original_admin_are_not_listed(): void
+    // Réponse « oui » du ticket KAN-12 à « les comptes en attente doivent-ils apparaître dans la liste ? »
+    public function test_pending_accounts_are_listed_but_not_the_original_admin(): void
     {
         config()->set('kantica.super_admin.mail', 'root@example.com');
         $event = $this->event();
@@ -102,10 +103,10 @@ class EventAttendancesTest extends TestCase
 
         $response = $this->getJson("/api/events/{$event->id}/attendances")
             ->assertOk()
-            ->assertJsonPath('data.total_count', 2);
+            ->assertJsonPath('data.total_count', 3);
 
         $this->assertContains('Rasoanaivo', $response->json('data.members.*.last_name'));
-        $this->assertNotContains('Andria', $response->json('data.members.*.last_name'));
+        $this->assertContains('Andria', $response->json('data.members.*.last_name'));
         $this->assertNotContains('Root', $response->json('data.members.*.last_name'));
     }
 
@@ -125,11 +126,12 @@ class EventAttendancesTest extends TestCase
 
     public function test_the_counter_only_counts_listed_members_and_the_event_asked(): void
     {
+        config()->set('kantica.super_admin.mail', 'root@example.com');
         $event = $this->event();
         $other = $this->event('Messe dominicale');
         $listed = $this->member('Rasoanaivo', 'Hanta');
-        $pending = $this->member('Andria', 'Tiana', 'T', UserStatus::Pending);
-        $this->markPresent($event, $listed, $pending);
+        $root = User::factory()->create(['mail' => 'root@example.com',]);
+        $this->markPresent($event, $listed, $root);
         $this->markPresent($other, $listed);
         Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
 
@@ -286,15 +288,16 @@ class EventAttendancesTest extends TestCase
 
     public function test_the_attendance_of_an_account_outside_the_list_is_kept(): void
     {
+        config()->set('kantica.super_admin.mail', 'root@example.com');
         $event = $this->event();
         $hanta = $this->member('Rasoanaivo', 'Hanta');
-        $pending = $this->member('Andria', 'Tiana', 'T', UserStatus::Pending);
-        $this->markPresent($event, $pending);
+        $root = User::factory()->create(['mail' => 'root@example.com',]);
+        $this->markPresent($event, $root);
         Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
 
         $this->putJson("/api/events/{$event->id}/attendances", ['present_member_ids' => [$hanta->id,],])->assertOk();
 
-        $this->assertEqualsCanonicalizing([$hanta->id, $pending->id,], $this->presentIds($event));
+        $this->assertEqualsCanonicalizing([$hanta->id, $root->id,], $this->presentIds($event));
     }
 
     public function test_an_unknown_member_is_refused_and_nothing_is_recorded(): void
@@ -310,17 +313,31 @@ class EventAttendancesTest extends TestCase
         $this->assertSame([], $this->presentIds($event));
     }
 
-    public function test_a_pending_account_and_the_original_admin_cannot_be_marked_present(): void
+    public function test_a_pending_account_can_be_marked_present_and_unmarked(): void
+    {
+        $event = $this->event();
+        $pending = $this->member('Andria', 'Tiana', 'T', UserStatus::Pending);
+        Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
+
+        $response = $this->putJson("/api/events/{$event->id}/attendances", ['present_member_ids' => [$pending->id,],])
+            ->assertOk()
+            ->assertJsonPath('data.present_count', 1);
+
+        $this->assertTrue(collect($response->json('data.members'))->firstWhere('id', $pending->id)['present']);
+        $this->assertSame([$pending->id,], $this->presentIds($event));
+
+        $this->putJson("/api/events/{$event->id}/attendances", ['present_member_ids' => [],])->assertOk();
+
+        $this->assertSame([], $this->presentIds($event));
+    }
+
+    public function test_the_original_admin_cannot_be_marked_present(): void
     {
         config()->set('kantica.super_admin.mail', 'root@example.com');
         $event = $this->event();
-        $pending = $this->member('Andria', 'Tiana', 'T', UserStatus::Pending);
         $root = User::factory()->create(['mail' => 'root@example.com',]);
         Sanctum::actingAs($this->userWithRole(RoleName::Secretary));
 
-        $this->putJson("/api/events/{$event->id}/attendances", ['present_member_ids' => [$pending->id,],])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['present_member_ids',]);
         $this->putJson("/api/events/{$event->id}/attendances", ['present_member_ids' => [$root->id,],])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['present_member_ids',]);

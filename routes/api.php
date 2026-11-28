@@ -139,7 +139,12 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
     // ── Événements ──────────────────────────────────────────────────────
     Route::prefix('events')->group(function () {
         Route::get('/', [EventController::class, 'index']);
-        Route::post('/', [EventController::class, 'store']);
+        // Création (KAN-12, « Nouvel événement ») : Secrétaire et Admin, Policy appelée avec la classe (403 avant tout)
+        Route::post('/', [EventController::class, 'store'])->can('create', Event::class);
+        // Choix de l'événement des présences (KAN-12) : à déclarer avant `/{event}`, qui n'a pas de contrainte numérique
+        // et prendrait « attendance-overview » pour un identifiant
+        Route::get('/attendance-overview', [EventController::class, 'attendanceOverview'])
+            ->can('manageAttendances', Event::class);
         Route::get('/{event}', [EventController::class, 'show']);
         Route::post('/{event}/subscribe', [EventController::class, 'subscribe']);
         Route::post('/{event}/check-in', [EventController::class, 'checkIn']);

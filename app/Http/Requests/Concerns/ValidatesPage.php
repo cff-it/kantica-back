@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Concerns;
 
-// Paramètre `page` des listes paginées (membres, rôles, historique des imports, répertoire) : règles, messages et
-// lecture au même endroit, pour que les quatre listes ne divergent pas (testé par ListPageTest). Borne haute : au-delà
+// Paramètre `page` des listes paginées (membres, rôles, historique des imports, répertoire, événements déjà saisis) :
+// règles, messages et lecture au même endroit, pour que les listes ne divergent pas (testé par ListPageTest). Borne haute : au-delà
 // de PHP_INT_MAX / 20, le décalage de la page n'est plus un entier (erreur 500 avec `forPage`, page arbitraire avec un
 // décalage SQL)
 trait ValidatesPage
