@@ -18,9 +18,12 @@ class EventPolicy
         return true;
     }
 
+    // Création d'un événement (KAN-12, formulaire « Nouvel événement ») : Secrétaire et Admin, à confirmer avec la
+    // présidente. Appelée avec la classe, sans événement, pour que le refus 403 passe avant tout 404. Le rôle
+    // « responsable » n'existe pas dans RoleName : il ne donnait accès à personne
     public function create(User $user): bool
     {
-        return $user->hasRole(['admin', 'responsable']);
+        return $user->hasRole([RoleName::Admin->value, RoleName::Secretary->value,]);
     }
 
     public function update(User $user, Event $event): bool

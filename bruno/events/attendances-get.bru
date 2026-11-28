@@ -32,11 +32,12 @@ docs {
   Liste de saisie des présences d'un événement (KAN-12, US-11). Lancer d'abord `login-secretary` (token `secretaryToken`).
   Le token doit appartenir à un compte actif et vérifié ayant le rôle `secretaire` ou `admin` (403 sinon, avant tout 404).
 
-  `eventId` vaut 1 par défaut (variable de la requête) : mettre l'identifiant d'un événement existant. La création des
-  événements n'est couverte par aucune story ; un événement se crée à la main en base.
+  `eventId` vaut 1 par défaut (variable de la requête) : mettre l'identifiant d'un événement existant (`events/create`
+  renvoie `createdEventId`, ou `php artisan db:seed --class=EventReferenceSeeder` crée des événements de démonstration).
 
   Réponse : `data.event` (`id`, `name`, `date_start`), `data.present_count` et `data.total_count` (« 5 / 9 présents »),
-  `data.members` : un membre actif par ligne (`id`, `last_name`, `first_name`, `voice_group`, `voice`, `present`), triés
-  par nom puis prénom. Les comptes en attente et le compte administrateur originel ne sont pas listés.
-  404 pour un événement inconnu ou un identifiant non numérique.
+  `data.members` : un membre par ligne (`id`, `last_name`, `first_name`, `voice_group`, `voice`, `present`), triés par nom
+  puis prénom. Les membres actifs et les comptes en attente sont listés, pas le compte administrateur originel.
+  404 pour un événement inconnu ou un identifiant non numérique. 422 (clé `event`) avant le jour de l'événement : les
+  présences se saisissent à partir du jour J, à l'heure de la chorale.
 }

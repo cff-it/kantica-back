@@ -183,7 +183,7 @@ public function toDTO(): CheckInDTO
 | **Répertoire chants** | `CreateSong`, `UpdateSong`, `AttachSongToMass`, `ListSongsAction` (`GET /api/songs`, KAN-18 : recherche par titre ou auteur, 20 par page), `DeleteSongAction` (`DELETE /api/songs/{song}`, admin) |
 | **Liturgie messes** | `CreateMass`, `AssignSongToMassPart`, `GeneratePptx` |
 | **Membres & rôles** | `ListMembersAction` (`GET /api/members?search=&voice=&page=`, 20 par page, `page` bornée à 100 000 comme la liste des rôles : voir « Rôles (KAN-35) »), `CreateUser`, `AssignRole`, `AssignMassRole`, `AssignVoiceAction` (`PUT /api/members/{member}/voice`, KAN-34 : voix seule, 422 sans fiche, voix précise effacée si le groupe change) |
-| **Événements** | `CreateEvent`, `RegisterMember`, `CheckInMember`, `ListEventAttendancesAction` (`GET /api/events/{event}/attendances`, KAN-12 : liste de saisie des présences), `RecordAttendancesAction` (`PUT /api/events/{event}/attendances`, KAN-12 : liste complète des présents, synchronisée) |
+| **Événements** | `CreateEventAction` (`POST /api/events`, KAN-12 : type, intitulé, date, lieu, Secrétaire et Admin), `RegisterMember`, `CheckInMember`, `ListAttendanceOverviewAction` (`GET /api/events/attendance-overview`, KAN-12 : choix de l'événement en trois groupes), `ListEventAttendancesAction` (`GET /api/events/{event}/attendances`, KAN-12 : liste de saisie des présences), `RecordAttendancesAction` (`PUT /api/events/{event}/attendances`, KAN-12 : liste complète des présents, synchronisée) |
 | **Paiements** | `CreateEventPayment`, `RecordUserPayment` |
 
 ---
@@ -195,10 +195,10 @@ public function toDTO(): CheckInDTO
 - `page` est bornée à 100 000 dans `ListUsersRequest` et `ListMembersRequest` (422 « La page demandée est trop
   grande. »), comme `ListSongsRequest` (répertoire, KAN-18) : sans borne, `PHP_INT_MAX` passait la validation et le
   décalage de la page (`forPage`, `array_slice`) n'était plus un entier, d'où une erreur 500. Règles, messages et
-  lecture de `page` sont communs aux quatre listes paginées (membres, rôles, historique des imports, répertoire) : trait
-  `ValidatesPage` (`app/Http/Requests/Concerns/`), avec les mêmes messages partout (« La page doit être un nombre
-  entier. », « … supérieure ou égale à 1. », « La page demandée est trop grande. »). `ListPageTest` vérifie les quatre
-  routes ensemble ; une nouvelle liste paginée reprend ce trait.
+  lecture de `page` sont communs aux listes paginées (membres, rôles, historique des imports, répertoire, et les
+  événements « Déjà saisis » de KAN-12) : trait `ValidatesPage` (`app/Http/Requests/Concerns/`), avec les mêmes messages
+  partout (« La page doit être un nombre entier. », « … supérieure ou égale à 1. », « La page demandée est trop
+  grande. »). `ListPageTest` vérifie les cinq routes ensemble ; une nouvelle liste paginée reprend ce trait.
   **Vérifié** : `ManageRolesTest` et `ListMembersTest` (page 100 000 vide, 100 001 et `PHP_INT_MAX` refusées ; ces
   tests finissaient en 500 avant la borne), sous SQLite et PostgreSQL, et contre le back de dev (les deux routes).
 - Même borne pour l'historique des imports (`ListUsersImportsRequest`, `GET /api/users/import?page=`, paginé en SQL).
@@ -304,34 +304,80 @@ public function toDTO(): CheckInDTO
   `2026_11_28_000000` ajoute l'unicité (`event_id`, `user_id`), après avoir réduit les doublons éventuels à la première
   ligne. `date_in` est l'heure de la première coche, `date_out` reste nul, et une présence maintenue n'est jamais
   réécrite.
-- Lecture : tous les membres **actifs** (`MemberRepository::allActive()`), sans les comptes en attente ni le compte
-  administrateur originel, triés comme la liste des membres (`MemberSortKey`, partagé avec `ListMembersAction`).
-  `present_count` ne compte que les membres listés, pour ne jamais dépasser `total_count`.
+- Lecture : tous les membres **actifs et les comptes en attente** (`MemberRepository::allAttendees()`, réponse « oui » du
+  ticket : la maquette en montre un), sans le compte administrateur originel, triés comme la liste des membres
+  (`MemberSortKey`, partagé avec `ListMembersAction`). `present_count` ne compte que les membres listés, pour ne jamais
+  dépasser `total_count`.
 - Enregistrement : le front envoie la liste complète des présents. Synchronisation dans une transaction : présences
   manquantes ajoutées, présences décochées supprimées. Idempotente, `[]` décoche tout. Le verrou (ligne de l'événement,
   `findForUpdate`) est pris **avant** de lire les présences : deux saisies simultanées passent l'une après l'autre. SQLite
   l'ignore : `EventAttendancesTest` vérifie la requête `FOR UPDATE` quand la suite tourne sous PostgreSQL (CI).
-- Seuls les membres actifs de la liste sont concernés : un identifiant inconnu, d'un compte en attente ou de
-  l'administrateur originel donne un 422 sur `present_member_ids` et rien n'est écrit ; une présence d'un compte hors
-  liste n'est jamais supprimée. Un identifiant en double donne un 422 (`distinct`), 1000 identifiants au plus.
+- Seuls les membres de la liste (actifs et en attente) sont concernés : un identifiant inconnu ou de l'administrateur
+  originel donne un 422 sur `present_member_ids` et rien n'est écrit ; une présence d'un compte hors liste n'est jamais
+  supprimée. Un identifiant en double donne un 422 (`distinct`), 1000 identifiants au plus. Chaque enregistrement réussi
+  pose `events.attendances_recorded_at` (voir « Choix et création des événements »).
 - `CheckInMemberAction` (`POST /api/events/{event}/check-in`) refuse maintenant toute présence existante, sortie
   enregistrée ou non : avec la contrainte d'unicité, un second pointage après `date_out` donnerait une erreur 500. Il
   prend le même verrou que la saisie (`findForUpdate`, dans une transaction, avant de chercher le doublon) et convertit
   une violation d'unicité en 422 ; `addAttendances` écrit en `insertOrIgnore`. **Toute écriture dans `event_checks` doit
   prendre ce verrou** : sinon une course avec la saisie donnerait une erreur 500.
-- Points du ticket tranchés par défaut, à confirmer avec la présidente : comptes en attente absents de la liste (le
-  ticket parle de « membres actifs »), saisie corrigeable à tout moment (le `PUT` est idempotent), saisie réservée à la
-  Secrétaire et à l'Admin. Restent ouverts : pointage par le membre lui-même, absences excusées, sélection de
-  l'événement côté front.
-- Hors périmètre : la création des événements n'est couverte par aucune story. `POST /api/events` et
-  `POST /api/events/{event}/check-in` n'ont aucun contrôle de rôle, et `EventPolicy` cite un rôle « responsable » qui
-  n'existe pas (règle effective inchangée).
+- Points du ticket tranchés (réponses du ticket) : comptes en attente dans la liste, saisie corrigeable à tout moment (le
+  `PUT` est idempotent), saisie réservée à la Secrétaire et à l'Admin pour l'instant. Restent ouverts : pointage par le
+  membre lui-même (non pour l'instant), absences excusées (non).
+- Hors périmètre : `POST /api/events/{event}/check-in` n'a aucun contrôle de rôle (le pointage par le membre lui-même est
+  un point ouvert du ticket).
 - Requêtes Bruno `events/attendances-get` et `events/attendances-put`.
-- **Vérifié** : `EventAttendancesTest` (36 tests : lecture, tri, comptes exclus, droits, 403 avant 404, identifiants
-  invalides, première saisie, correction, idempotence, liste vide, présence écrite entre la lecture et l'écriture,
-  contrainte d'unicité, migration des doublons) et `CheckInMemberTest` (4 tests : doublon, pointage après une sortie,
-  verrou pris dans une transaction avant le doublon, course convertie en 422), suite complète sous SQLite (747 réussis). **Non vérifié** : PostgreSQL (verrou `FOR UPDATE`,
-  migration), laissé à la CI ; appels réels sur le back de dev.
+- **Vérifié** : `EventAttendancesTest` (37 tests : lecture, tri, comptes en attente listés et acceptés, compte originel
+  refusé, droits, 403 avant 404, identifiants invalides, première saisie, correction, idempotence, liste vide, présence
+  écrite entre la lecture et l'écriture, contrainte d'unicité, migration des doublons) et `CheckInMemberTest` (4 tests :
+  doublon, pointage après une sortie, verrou pris dans une transaction avant le doublon, course convertie en 422).
+  **Non vérifié** : PostgreSQL (verrou `FOR UPDATE`, migrations), laissé à la CI ; appels réels sur le back de dev.
+
+### Choix et création des événements (KAN-12, ajout du 28/11)
+
+- Modèle : `events` gagne `type` (`EventType` : `repetition`, `messe`, `concert`, `autre` ; défaut `autre` pour les lignes
+  existantes), `location` (255, facultatif) et `attendances_recorded_at`, avec un index `(type, date_start)`. La
+  migration `2026_11_28_100000` marque aussi « saisis » les événements qui ont déjà des présences (date de la dernière
+  présence écrite). `attendances_recorded_at` n'est pas modifiable en masse : seule `RecordAttendancesAction` le pose, à
+  chaque enregistrement, **même à 0 présent**. C'est ce champ, et non le nombre de présences, qui fait passer un
+  événement en « Déjà saisis ». `EventFactory` (états `ofType`, `startingAt`, `recorded`) sert aux tests.
+- Fuseau : `app.timezone` reste en UTC (les dates déjà en base sont en UTC : le changer les décalerait toutes). « Le jour
+  de l'événement » se lit dans `config('kantica.timezone')` (variable `KANTICA_TIMEZONE`, défaut `Indian/Antananarivo`,
+  UTC+3), via `App\Support\ChoirTime`. Une date **sans décalage** envoyée à `POST /api/events` se lit dans ce fuseau
+  (« 2026-12-05 17:00 » est enregistrée 14 h UTC) ; avec un décalage (`+03:00`, `Z`) il est respecté. Les réponses
+  restent en UTC (ISO 8601, `+00:00`) : le front convertit à l'affichage.
+- Règle du jour J : `GET` et `PUT /api/events/{event}/attendances` répondent 422 (clé `event`, « Les présences se
+  saisissent à partir du jour de l'événement. ») si `date_start` est après la fin de la journée en cours dans le fuseau
+  de la chorale (`EnsureAttendancesOpenAction`). Les événements passés restent saisissables et corrigeables ; le 403 et
+  le 404 passent avant.
+- Création : `POST /api/events` (`CreateEventAction`) : `type`, `name` et `date_start` requis ; `location`, `date_end`,
+  `need_payment` et `payment_amount` facultatifs. **Secrétaire et Admin** (`EventPolicy::create`, `->can('create',
+  Event::class)` sur la route, contrôlée aussi par `CreateEventRequest`), à confirmer avec la présidente. Avant, la route
+  n'avait aucun contrôle de rôle (tout compte connecté créait un événement) et la Policy citait un rôle « responsable »
+  absent de `RoleName`. `update` et `manageRegistrations` le citent encore (aucune route : non touchées).
+  `EventResource` renvoie `type` et `location`.
+- Aperçu : `GET /api/events/attendance-overview?type=&page=` (`ListAttendanceOverviewAction`, Secrétaire et Admin,
+  déclarée **avant** `GET /{event}`, qui n'a pas de contrainte numérique). `data` : `to_record` (sans saisie, jusqu'à la
+  fin de la journée en cours, du plus récent au plus ancien), `upcoming` (sans saisie, après aujourd'hui, du plus proche,
+  **10 au plus**), `recorded` (saisie posée, du plus récent, **20 par page**, `page` bornée comme les autres listes). Les
+  trois groupes forment une partition : un événement saisi est toujours dans `recorded`, même daté du futur. Chaque
+  élément : `id`, `name`, `type`, `date_start`, `location` ; `recorded` ajoute `present_count` (présences des membres de
+  la liste de saisie seulement) et `total` (effectif de la liste). `meta` : `counts` (`to_record`, `upcoming`,
+  `recorded`, les **totaux** de chaque groupe : `upcoming` peut dépasser les 10 lignes affichées), `page`, `per_page`,
+  `last_page`. `?type=` filtre les trois groupes et les décomptes ; sans lui, tous les types. Cinq requêtes quel que soit
+  le nombre d'événements (testé).
+- Démonstration : `php artisan db:seed --class=EventReferenceSeeder` (8 événements aux dates relatives à aujourd'hui : 2
+  saisis avec des présences, 3 à saisir dont un du jour, 3 à venir). À la main, jamais par `app:deploy` ; relancé, il ne
+  crée que les intitulés absents.
+- Requêtes Bruno `events/create` et `events/attendance-overview`.
+- À confirmer avec la présidente : qui crée les événements (Secrétaire et Admin pour l'instant) ; `total` de « 8 / 9
+  présents » = effectif actuel et non celui de la date de l'événement. Modification et suppression d'un événement : pas
+  maquettées, aucune route.
+- **Vérifié** : `CreateEventTest` (25 tests), `AttendanceOverviewTest` (21 : groupes, tri, bornes du jour à la seconde,
+  décomptes, filtre, plafond de 10, pagination, nombre de requêtes constant, droits), `AttendanceDayRuleTest` (15 : règle
+  du jour J dans le fuseau de la chorale, `attendances_recorded_at`), `EventColumnsMigrationTest` (2),
+  `EventReferenceSeederTest` (5) et `ListPageTest` (cinq routes), suite complète sous SQLite (837 réussis, 1 ignoré).
+  **Non vérifié** : PostgreSQL (migration, requêtes de l'aperçu), laissé à la CI ; appels réels sur le back de dev.
 
 ## Conventions de nommage
 

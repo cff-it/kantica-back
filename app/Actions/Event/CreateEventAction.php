@@ -14,8 +14,10 @@ readonly class CreateEventAction
     {
         return $this->events->create([
             'name'           => $dto->name,
+            'type'           => $dto->type,
             'date_start'     => $dto->dateStart,
             'date_end'       => $dto->dateEnd,
+            'location'       => $dto->location,
             'need_payment'   => $dto->needPayment,
             'payment_amount' => $dto->paymentAmount,
         ]);

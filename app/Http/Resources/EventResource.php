@@ -12,8 +12,10 @@ class EventResource extends JsonResource
         return [
             'id'             => $this->id,
             'name'           => $this->name,
+            'type'           => $this->type->value,
             'date_start'     => $this->date_start->toIso8601String(),
             'date_end'       => $this->date_end?->toIso8601String(),
+            'location'       => $this->location,
             'need_payment'   => $this->need_payment,
             'payment_amount' => $this->payment_amount,
             'subscriptions'  => $this->whenLoaded(

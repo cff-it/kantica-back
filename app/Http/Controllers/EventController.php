@@ -4,13 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Actions\Event\CheckInMemberAction;
 use App\Actions\Event\CreateEventAction;
+use App\Actions\Event\ListAttendanceOverviewAction;
 use App\Actions\Event\ListEventAttendancesAction;
 use App\Actions\Event\RecordAttendancesAction;
 use App\Actions\Event\SubscribeToEventAction;
 use App\Http\Requests\Event\CheckInRequest;
 use App\Http\Requests\Event\CreateEventRequest;
+use App\Http\Requests\Event\ListAttendanceOverviewRequest;
 use App\Http\Requests\Event\RecordAttendancesRequest;
 use App\Http\Requests\Event\SubscribeToEventRequest;
+use App\Http\Resources\AttendanceOverviewResource;
 use App\Http\Resources\EventAttendanceResource;
 use App\Http\Resources\EventResource;
 use App\Repositories\EventRepository;
@@ -48,6 +51,14 @@ class EventController extends Controller
         $check = $action($request->toDTO());
 
         return response()->json($check, 201);
+    }
+
+    // Écran de choix de l'événement des présences : « À saisir », « À venir » et « Déjà saisis »
+    public function attendanceOverview(
+        ListAttendanceOverviewRequest $request,
+        ListAttendanceOverviewAction $action,
+    ): AttendanceOverviewResource {
+        return AttendanceOverviewResource::make($action($request->toDTO()));
     }
 
     // Identifiant brut (pas de route model binding) : le refus 403 de la route passe avant tout 404
