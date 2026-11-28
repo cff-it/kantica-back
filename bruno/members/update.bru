@@ -5,9 +5,13 @@ meta {
 }
 
 put {
-  url: {{baseUrl}}/members/17
+  url: {{baseUrl}}/members/{{memberId}}
   body: json
-  auth: inherit
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{secretaryToken}}
 }
 
 headers {
@@ -18,9 +22,26 @@ body:json {
   {
     "last_name": "Rasoanaivo",
     "first_name": "Hanta",
-    "voice_group": "S",
-    "voice": "S1",
-    "phone": "034 12 345 67"
+    "voice_group": "A",
+    "voice": "A2",
+    "phone": "034 12 345 67",
+    "birth_date": "12/03/1998",
+    "birth_place": "Antananarivo",
+    "address": "Lot IVB 12 Faravohitra, Antananarivo",
+    "social_pseudo": null,
+    "region_registration_number": "1234 Faravohitra",
+    "adhesion_date": "Septembre 2019",
+    "engagement_date": "08/12/2020",
+    "engagement_place": "Ecar Faravohitra",
+    "baptism": {"date": "05/1998", "place": "Ecar Faravohitra"},
+    "first_communion": {"date": "2008", "place": "Ecar Faravohitra"},
+    "confirmation": {"date": "15/08/2012", "place": "Cathédrale Andohalo"},
+    "marriage": {"spouse": null, "date": null, "place": null},
+    "emergency_contact": {
+      "relationships": ["Parents"],
+      "name": "RASOANAIVO Papa, RASOANAIVO Maman",
+      "phone": "034 00 000 02 / 033 00 000 03"
+    }
   }
 }
 
@@ -31,6 +52,13 @@ tests {
     expect(res.body.data.profile.completed).to.equal(true);
     expect(res.body.data.profile.voice_group).to.equal("A");
     expect(res.body.data.profile.voice).to.equal("A2");
+    // Les dates sont écrites selon ce qui est connu : jour, mois ou année seulement
+    expect(res.body.data.profile.birth_date).to.equal("1998-03-12");
+    expect(res.body.data.profile.adhesion_date).to.equal("2019-09");
+    expect(res.body.data.profile.baptism.date).to.equal("1998-05");
+    expect(res.body.data.profile.first_communion.date).to.equal("2008");
+    expect(res.body.data.profile.confirmation.date).to.equal("2012-08-15");
+    expect(res.body.data.profile.emergency_contact.relationships).to.deep.equal(["Parents"]);
   });
 }
 
@@ -39,10 +67,22 @@ docs {
   et `auth/register` (`memberId`). Le token doit appartenir à un compte actif et vérifié ayant le rôle `secretaire` ou `admin`
   (403 sinon).
 
-  Mêmes champs et mêmes validations que `me/profile-put` : `voice_group` (S, A, T ou B, obligatoire), `voice` (S1, A2...,
-  facultative, doit appartenir au groupe), `last_name`, `first_name` et `phone` obligatoires.
-  La secrétaire et l'admin peuvent changer la voix d'un membre.
+  Fiche complète (maquette « Modifier la fiche ») : le PUT remplace toute la fiche.
+  Obligatoires : `last_name`, `first_name`, `voice_group` (S, A, T ou B), `phone`, `birth_date` (jj/mm/aaaa), `birth_place`,
+  `address`, `adhesion_date`, `baptism`, `first_communion`, `confirmation` (chacun `{date, place}`) et `emergency_contact`
+  (`{relationships[], name, phone}`).
+  Facultatifs, effacés quand ils sont absents ou vides : `social_pseudo`, `region_registration_number`, `engagement_date`,
+  `engagement_place` et `marriage` (`{spouse, date, place}` ; un bloc sans conjoint, date ni lieu supprime le mariage).
 
-  L'email, le statut et les rôles du compte ne sont pas modifiables ici : tout champ `mail`, `contact_mail` ou `status` envoyé est ignoré.
+  Dates : jour, mois ou année seulement (`12/03/1998`, `05/1998`, `Septembre 2019`, `2008`, ou `1998-03-12`, `1998-05`), jamais
+  dans le futur ; la date de naissance est complète. La réponse les écrit `1998-03-12`, `1998-05` ou `2008` selon ce qui est connu.
+
+  `voice` (S1, A2..., facultative, doit appartenir au groupe) : sans cette clé, la voix précise reste tant que le groupe ne change
+  pas ; `null` l'efface. La secrétaire et l'admin peuvent changer la voix d'un membre.
+  `emergency_contact.relationships` : au moins un lien (Parents, Famille, Tuteur/Tutrice, Ami(e) proche), sans virgule ; une seule
+  ligne de contact par membre.
+
+  L'email, le statut, les rôles et la photo du compte ne sont pas modifiables ici : tout champ `mail`, `contact_mail`, `status` ou
+  `picture_url` envoyé est ignoré.
   La réponse est identique à `members/show`.
 }
