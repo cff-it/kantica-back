@@ -15,14 +15,14 @@ readonly class CheckInMemberAction
     {
         $this->events->findById($dto->eventId);
 
+        // Une seule présence par membre et par événement (KAN-12), sortie ou non : la base refuse le doublon
         $existing = EventCheck::where('event_id', $dto->eventId)
             ->where('user_id', $dto->userId)
-            ->whereNull('date_out')
             ->first();
 
         if ($existing) {
             throw ValidationException::withMessages([
-                'user_id' => ['Ce membre est déjà enregistré en entrée pour cet événement.'],
+                'user_id' => ['Ce membre est déjà enregistré pour cet événement.'],
             ]);
         }
 
