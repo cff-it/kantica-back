@@ -80,12 +80,17 @@ class DeleteSongTest extends TestCase
         $this->deleteJson('/api/songs/999')->assertNotFound();
     }
 
-    // whereNumber sur la route : sans lui, `abc` arrivait dans le paramètre `int $song` du contrôleur (erreur 500)
-    public function test_a_non_numeric_id_is_not_found(): void
+    // Contrainte de la route : sans elle, `abc` ou un nombre trop grand pour un entier arrivaient dans le paramètre
+    // `int $song` du contrôleur (erreur 500)
+    public function test_an_id_that_is_not_an_integer_is_not_found(): void
     {
         Sanctum::actingAs($this->userWithRole(RoleName::Admin));
 
-        $this->deleteJson('/api/songs/abc')->assertNotFound();
+        foreach (['abc', '99999999999999999999',] as $id) {
+            $this->getJson("/api/songs/{$id}")->assertNotFound();
+            $this->putJson("/api/songs/{$id}", ['title' => 'Modifié',])->assertNotFound();
+            $this->deleteJson("/api/songs/{$id}")->assertNotFound();
+        }
     }
 
     // Relevé par la revue de KAN-18 : DeleteSongAction charge le cantique une seule fois avant de le supprimer
