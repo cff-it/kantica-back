@@ -242,16 +242,16 @@ public function toDTO(): CheckInDTO
   (`create`, `update`, `delete` avec `RoleName::Admin` ; KAN-13 : « Un utilisateur non admin ne peut pas créer de
   cantique », modification « uniquement pour l'Admin »). Avant, un compte sans rôle pouvait lire chaque cantique, et tout
   compte validé pouvait en créer, modifier ou supprimer.
-- Défense en profondeur : `CreateSongRequest`, `UpdateSongRequest` et `DeleteSongRequest` contrôlent aussi le rôle
-  (`authorize()` avec la classe), après la route ; `SongPolicyTest` le vérifie hors des routes. `view`, `update` et
-  `delete` prennent le cantique en option (`?Song $song = null`), aucun droit n'en dépendant encore : appel par la classe
-  ici, avec le cantique dans les FormRequests de KAN-38 (PR de Kevin non fusionnée au 28 novembre 2026), qui réécrit
-  `CreateSongRequest` et `UpdateSongRequest` : garder sa version en cas de conflit. `SongPolicyTest` vérifie que les
-  deux appels donnent la même réponse.
+- Défense en profondeur : les FormRequests contrôlent aussi le rôle, après la route. `CreateSongRequest` et
+  `DeleteSongRequest` appellent la Policy avec la classe (`SongPolicyTest` le vérifie hors des routes) ;
+  `UpdateSongRequest` (KAN-38) charge le cantique de la route et l'appelle avec lui (couverte par
+  `SaveSongAuthorizationTest`). `view`, `update` et `delete` prennent donc le cantique en option (`?Song $song = null`),
+  aucun droit n'en dépendant encore ; `SongPolicyTest` vérifie que les deux appels donnent la même réponse.
 - Les routes `/{song}` limitent l'identifiant à 18 chiffres (`where` sur le groupe `songs`, `[0-9]{1,18}`, sous
   `PHP_INT_MAX`) : un identifiant non numérique ou trop grand donne un 404 au lieu d'une erreur 500 sur le paramètre
-  `int` du contrôleur (`whereNumber` laissait passer `99999999999999999999`). KAN-38 pose `whereNumber` sur ces lignes :
-  en cas de conflit, garder cette contrainte et `can`.
+  `int` du contrôleur (`whereNumber` laissait passer `99999999999999999999`). Cette contrainte remplace les
+  `whereNumber` de KAN-38 (rebase de sa branche sur `develop`, 28 novembre 2026) ; elle garantit aussi l'identifiant
+  que lit `UpdateSongRequest`.
 - Suppression : `DeleteSongAction` reçoit l'identifiant, lit le cantique une seule fois (404 s'il n'existe pas, pour
   l'admin) et le supprime par le modèle, pour que les événements Eloquent (et les sections de KAN-38) suivent ; une
   suppression directe par identifiant éviterait la lecture mais les court-circuiterait. Le rôle « responsable » que
