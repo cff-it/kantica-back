@@ -238,9 +238,10 @@ public function toDTO(): CheckInDTO
   (`viewAny`, `SongPolicy::view` aligné). `POST /`, `PUT /{song}` et `DELETE /{song}` : **admin seulement**
   (`create`, `update`, `delete` avec `RoleName::Admin` ; KAN-13 : « Un utilisateur non admin ne peut pas créer de
   cantique », modification « uniquement pour l'Admin »). Avant, un compte sans rôle pouvait lire chaque cantique, et tout
-  compte validé pouvait en créer, modifier ou supprimer. Aucune méthode de `SongPolicy` ne prend le cantique, puisque
-  le droit n'en dépend pas ; un appel avec le cantique (`can('update', $song)` dans les FormRequests de KAN-38, PR de
-  Kevin non fusionnée au 28 novembre 2026) reste accepté, PHP ignorant l'argument en plus. Ces FormRequests contrôleront
+  compte validé pouvait en créer, modifier ou supprimer. `view`, `update` et `delete` prennent le cantique en option
+  (`?Song $song = null`), aucun droit n'en dépendant encore : la route les appelle avec la classe, les FormRequests de
+  KAN-38 (PR de Kevin non fusionnée au 28 novembre 2026) avec le cantique ; `SongPolicyTest` vérifie que les deux
+  appels donnent la même réponse. Ces FormRequests contrôleront
   une seconde fois : à unifier à leur fusion. `authorize()` de `CreateSongRequest` et `UpdateSongRequest` reste à `true`
   ici, KAN-38 les réécrit ; les tests HTTP échouent si le contrôle de la route disparaît. Les routes `/{song}` ont
   `whereNumber('song')` : un identifiant non numérique donne un 404 au lieu d'une erreur 500 sur le paramètre `int` du
@@ -258,8 +259,8 @@ public function toDTO(): CheckInDTO
   crée que les titres absents et ne touche à aucun autre cantique. Requête Bruno `songs/list`.
 - **Vérifié** : `ListSongsTest` (29 tests, dont « œ », un cantique sans auteur, le jeu de démonstration et la page trop
   grande), `DeleteSongTest` (10 tests, dont le 403 avant le 404, l'identifiant non numérique et une seule lecture du
-  cantique), `ShowSongTest` (8 tests, dont la Policy appelée avec le cantique), `SaveSongAuthorizationTest` (10 tests :
-  admin, autres rôles, sans rôle, invité, compte en attente), suite
+  cantique), `ShowSongTest` (7 tests), `SaveSongAuthorizationTest` (10 tests : admin, autres rôles, sans rôle, invité,
+  compte en attente), `SongPolicyTest` (appels avec et sans le cantique), suite
   complète sous SQLite et sous PostgreSQL, appels réels sur la base de dev avec un compte membre (tri, recherche sans
   accents, compteur, 422, 401) et avec l'admin (suppressions 204, cantique inconnu 404, lecture d'un cantique 200).
   **Non vérifié** : la préprod Railway, où le jeu de démonstration n'a pas été chargé.
