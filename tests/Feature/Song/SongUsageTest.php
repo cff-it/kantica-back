@@ -195,6 +195,33 @@ class SongUsageTest extends TestCase
             ->assertJsonPath('data.usage.times_sung', 1);
     }
 
+    // L'historique est borné aux 50 utilisations les plus récentes ; le compteur, lui, compte toutes les utilisations
+    public function test_the_history_is_limited_to_the_fifty_most_recent_uses_but_the_count_is_complete(): void
+    {
+        $song = $this->song();
+        // Créées de la plus ancienne à la plus récente : la limite coupe les plus anciennes, pas les dernières saisies
+        foreach (range(52, 1) as $daysAgo) {
+            $this->sing($song, $this->mass($this->day($daysAgo), "Messe {$daysAgo}"));
+        }
+
+        $response = $this->getJson("/api/songs/{$song->id}")->assertOk();
+
+        $this->assertSame(52, $response->json('data.usage.times_sung'));
+        $this->assertCount(50, $response->json('data.usage.history'));
+        $this->assertSame('Messe 1', $response->json('data.usage.last_sung.occasion'));
+        $this->assertSame('Messe 50', $response->json('data.usage.history.49.occasion'));
+    }
+
+    public function test_saving_a_song_does_not_return_the_usage(): void
+    {
+        $song = $this->song();
+        $this->sing($song, $this->mass($this->day(7), 'Christ Roi'));
+
+        $this->putJson("/api/songs/{$song->id}", ['title' => 'Gloria',])
+            ->assertOk()
+            ->assertJsonMissingPath('data.usage');
+    }
+
     public function test_the_song_list_does_not_load_the_usage(): void
     {
         $song = $this->song();

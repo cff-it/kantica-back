@@ -32,7 +32,9 @@ tests {
 
   test("historique d'usage du cantique", function () {
     const usage = res.body.data.usage;
-    expect(usage.times_sung).to.equal(usage.history.length);
+    // `history` ne garde que les 50 utilisations les plus récentes, `times_sung` les compte toutes
+    expect(usage.times_sung).to.be.at.least(usage.history.length);
+    expect(usage.history.length).to.be.at.most(50);
     expect(usage.last_sung).to.deep.equal(usage.history[0] ?? null);
     usage.history.forEach((use, index) => {
       expect(use.date).to.match(/^\d{4}-\d{2}-\d{2}$/);
@@ -53,7 +55,7 @@ docs {
   `usage` aide à choisir les cantiques d'une messe (éviter les répétitions, équilibrer le répertoire) :
   - `times_sung` : nombre de fois où le cantique a été chanté (un cantique chanté deux fois dans la même messe compte deux fois) ;
   - `last_sung` : la dernière fois (`mass_id`, `date`, `occasion`, `part`), ou `null` s'il n'a jamais été chanté ;
-  - `history` : toutes les utilisations, de la plus récente à la plus ancienne ; `last_sung` en est le premier élément.
+  - `history` : les 50 utilisations les plus récentes, de la plus récente à la plus ancienne ; `last_sung` en est le premier élément.
 
   `date` est celle de la messe (`2026-11-15`), `occasion` son nom liturgique (`null` s'il n'est pas renseigné) et `part` la partie
   de la messe (Entrée, Communion...). Seules les messes déjà célébrées comptent (date du jour comprise) : une messe préparée pour

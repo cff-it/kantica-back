@@ -60,5 +60,7 @@ docs {
   Chaque section est remplacée en entier par ce qui est envoyé : sans `number`, la section n'a plus de numéro.
 
   `sections` omis ou `null` : les sections existantes sont conservées. `sections: []` : toutes les sections sont supprimées.
-  Une section supprimée disparaît aussi de l'ordre des messes qui l'utilisent (comportement à confirmer, voir US-18).
+  Une section que l'ordre d'une messe utilise ne peut pas être supprimée : 422 sur `sections`, rien n'est enregistré (pas même le
+  titre). Elle peut être modifiée ou déplacée. Blocage à confirmer avec la présidente avant US-18.
+  Limites : 100 sections au plus, `text` de 5000 caractères au plus, `notes` de 2000 (422 sinon).
 }

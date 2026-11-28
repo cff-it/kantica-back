@@ -14,12 +14,13 @@ readonly class UpdateSongAction
         private SyncSongSectionsAction $syncSections,
     ) {}
 
-    // Le cantique et ses sections sont enregistrés ensemble ou pas du tout. Sans liste de sections dans la requête,
-    // les sections existantes sont conservées ; une liste vide les supprime toutes.
+    // Le cantique et ses sections sont enregistrés ensemble ou pas du tout (un 422 sur les sections annule aussi le titre).
+    // Sans liste de sections dans la requête, les sections existantes sont conservées ; une liste vide les supprime toutes,
+    // sauf celles que l'ordre d'une messe utilise (SyncSongSectionsAction).
     public function __invoke(UpdateSongDTO $dto): Song
     {
         return DB::transaction(function () use ($dto): Song {
-            $song = $this->songs->update($this->songs->findById($dto->id), [
+            $song = $this->songs->update($this->songs->findByIdForUpdate($dto->id), [
                 'title'     => $dto->title,
                 'author'    => $dto->author,
                 'reference' => $dto->reference,

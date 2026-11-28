@@ -323,6 +323,39 @@ class SongSectionsTest extends TestCase
         $this->assertDatabaseCount('songs', 1);
     }
 
+    public function test_a_null_list_keeps_the_existing_sections(): void
+    {
+        $this->actingAsAdmin();
+        $song = $this->song([[SectionType::Verse, 'Un',], [SectionType::Chorus, 'Deux',],]);
+
+        $this->putJson("/api/songs/{$song->id}", ['title' => 'Nouveau titre', 'sections' => null,])
+            ->assertOk()
+            ->assertJsonPath('data.title', 'Nouveau titre')
+            ->assertJsonCount(2, 'data.sections');
+
+        $this->assertSame([['couplet', 'Un', 0,], ['refrain', 'Deux', 1,],], $this->storedSections($song));
+    }
+
+    // Une section renvoyée telle quelle n'est pas réécrite : seule la section modifiée coûte une requête UPDATE
+    public function test_only_the_sections_that_changed_are_written(): void
+    {
+        $this->actingAsAdmin();
+        $song = $this->song([[SectionType::Verse, 'Un', 1,], [SectionType::Chorus, 'Deux',],]);
+        [$verse, $chorus] = $this->sectionIds($song);
+
+        DB::enableQueryLog();
+        $this->putJson("/api/songs/{$song->id}", $this->payload([
+            ['id' => $verse, 'type' => 'couplet', 'number' => 1, 'text' => 'Un'],
+            ['id' => $chorus, 'type' => 'refrain', 'text' => 'Deux modifié'],
+        ]))->assertOk();
+        $updates = collect(DB::getQueryLog())
+            ->filter(fn (array $query) => str_contains($query['query'], 'update "song_sections"'));
+        DB::disableQueryLog();
+
+        $this->assertCount(1, $updates);
+        $this->assertSame([['couplet', 'Un', 0,], ['refrain', 'Deux modifié', 1,],], $this->storedSections($song));
+    }
+
     public function test_a_section_of_another_song_is_refused_and_nothing_is_saved(): void
     {
         $this->actingAsAdmin();
@@ -390,6 +423,8 @@ class SongSectionsTest extends TestCase
             'text not a string'    => [[['type' => 'couplet', 'text' => ['a',],],], 'sections.0.text',],
             'second one invalid'   => [[['type' => 'couplet', 'text' => 'Ok',], ['type' => 'strophe', 'text' => 'Ko',],], 'sections.1.type',],
             'not a list'           => ['abc', 'sections',],
+            'too many sections'    => [array_fill(0, 101, ['type' => 'couplet', 'text' => 'Texte',], ), 'sections',],
+            'text too long'        => [[['type' => 'couplet', 'text' => str_repeat('a', 5001),],], 'sections.0.text',],
         ];
     }
 
@@ -431,6 +466,41 @@ class SongSectionsTest extends TestCase
                 'sections.0.number' => 'Le numéro de la section doit être au moins 1.',
                 'sections.0.text'   => 'Le texte de la section est obligatoire.',
             ]);
+    }
+
+    public function test_the_limit_messages_are_explicit(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/songs', [
+            'title'    => 'Gloria',
+            'notes'    => str_repeat('a', 2001),
+            'sections' => array_fill(0, 101, ['type' => 'couplet', 'text' => 'Texte',], ),
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'notes'    => 'Les notes ne peuvent pas dépasser 2000 caractères.',
+                'sections' => 'Un cantique ne peut pas avoir plus de 100 sections.',
+            ]);
+
+        $this->postJson('/api/songs', $this->payload([['type' => 'couplet', 'text' => str_repeat('a', 5001),],]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'sections.0.text' => 'Le texte d\'une section ne peut pas dépasser 5000 caractères.',
+            ]);
+    }
+
+    public function test_the_limits_themselves_are_accepted(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/songs', [
+            'title'    => 'Gloria',
+            'notes'    => str_repeat('a', 2000),
+            'sections' => array_fill(0, 100, ['type' => 'couplet', 'text' => str_repeat('a', 5000),], ),
+        ])->assertCreated();
+
+        $this->assertDatabaseCount('song_sections', 100);
     }
 
     // ── Types (couplet, refrain, pont) et numéros saisis ────────────────────
@@ -572,16 +642,9 @@ class SongSectionsTest extends TestCase
 
     // ── Section utilisée dans l'ordre d'une messe (US-18) ───────────────────
 
-    /**
-     * Comportement actuel, à confirmer avec la présidente (point ouvert de KAN-38) : supprimer une section l'enlève
-     * aussi de l'ordre des messes qui l'utilisent (suppression en cascade). L'alternative est de refuser la suppression.
-     */
-    public function test_deleting_a_section_used_by_a_mass_removes_it_from_that_mass(): void
+    // Le cantique est chanté à une messe, avec ces sections dans l'ordre (comme le fera US-18)
+    private function useInMass(Song $song, int ...$sectionIds): void
     {
-        $this->actingAsAdmin();
-        $song = $this->song([[SectionType::Verse, 'Un',], [SectionType::Chorus, 'Deux',],]);
-        [$verse, $chorus] = $this->sectionIds($song);
-
         $massId = DB::table('masses')->insertGetId(['date' => '2026-12-06',]);
         $typeId = DB::table('mass_part_types')->insertGetId(['name' => 'Entrée',]);
         $partId = DB::table('mass_parts')->insertGetId([
@@ -590,16 +653,82 @@ class SongSectionsTest extends TestCase
             'mass_part_type_id' => $typeId,
         ]);
         $massSongId = DB::table('mass_songs')->insertGetId(['mass_part_id' => $partId, 'song_id' => $song->id,]);
-        DB::table('mass_song_sections')->insert([
-            ['mass_song_id' => $massSongId, 'song_section_id' => $verse, 'position' => 0,],
-            ['mass_song_id' => $massSongId, 'song_section_id' => $chorus, 'position' => 1,],
-        ]);
+
+        foreach ($sectionIds as $position => $sectionId) {
+            DB::table('mass_song_sections')->insert([
+                'mass_song_id'    => $massSongId,
+                'song_section_id' => $sectionId,
+                'position'        => $position,
+            ]);
+        }
+    }
+
+    /**
+     * Comportement à confirmer avec la présidente (point ouvert de KAN-38) : supprimer une section que l'ordre d'une
+     * messe utilise est refusé, au lieu de l'enlever en silence du programme de cette messe (cascade SQL). Rien n'est
+     * enregistré : ni la suppression, ni le nouveau titre.
+     */
+    public function test_a_section_used_by_a_mass_cannot_be_deleted(): void
+    {
+        $this->actingAsAdmin();
+        $song = $this->song([[SectionType::Verse, 'Un',], [SectionType::Chorus, 'Deux',],]);
+        [$verse, $chorus] = $this->sectionIds($song);
+        $this->useInMass($song, $verse, $chorus);
 
         $this->putJson("/api/songs/{$song->id}", $this->payload([
             ['id' => $chorus, 'type' => 'refrain', 'text' => 'Deux'],
+        ], 'Titre modifié'))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['sections' => 'Une section utilisée dans l\'ordre d\'une messe ne peut pas être supprimée.',]);
+
+        $this->assertSame('Gloria', $song->fresh()->title);
+        $this->assertSame([['couplet', 'Un', 0,], ['refrain', 'Deux', 1,],], $this->storedSections($song));
+        $this->assertDatabaseCount('mass_song_sections', 2);
+    }
+
+    public function test_an_empty_list_cannot_delete_the_sections_used_by_a_mass(): void
+    {
+        $this->actingAsAdmin();
+        $song = $this->song([[SectionType::Verse, 'Un',], [SectionType::Chorus, 'Deux',],]);
+        $this->useInMass($song, ...$this->sectionIds($song));
+
+        $this->putJson("/api/songs/{$song->id}", $this->payload([]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['sections',]);
+
+        $this->assertDatabaseCount('song_sections', 2);
+        $this->assertDatabaseCount('mass_song_sections', 2);
+    }
+
+    public function test_a_section_used_by_a_mass_can_be_modified_and_reordered(): void
+    {
+        $this->actingAsAdmin();
+        $song = $this->song([[SectionType::Verse, 'Un',], [SectionType::Chorus, 'Deux',],]);
+        [$verse, $chorus] = $this->sectionIds($song);
+        $this->useInMass($song, $verse, $chorus);
+
+        $this->putJson("/api/songs/{$song->id}", $this->payload([
+            ['id' => $chorus, 'type' => 'refrain', 'text' => 'Deux modifié'],
+            ['id' => $verse, 'type' => 'couplet', 'text' => 'Un modifié'],
         ]))->assertOk();
 
-        $this->assertDatabaseMissing('mass_song_sections', ['song_section_id' => $verse,]);
-        $this->assertDatabaseHas('mass_song_sections', ['song_section_id' => $chorus,]);
+        $this->assertSame([['refrain', 'Deux modifié', 0,], ['couplet', 'Un modifié', 1,],], $this->storedSections($song));
+        $this->assertDatabaseCount('mass_song_sections', 2);
+    }
+
+    public function test_a_section_that_no_mass_uses_can_be_deleted_next_to_a_used_one(): void
+    {
+        $this->actingAsAdmin();
+        $song = $this->song([[SectionType::Verse, 'Un',], [SectionType::Chorus, 'Deux',],]);
+        [$verse, $chorus] = $this->sectionIds($song);
+        $this->useInMass($song, $verse);
+
+        $this->putJson("/api/songs/{$song->id}", $this->payload([
+            ['id' => $verse, 'type' => 'couplet', 'text' => 'Un'],
+        ]))->assertOk();
+
+        $this->assertSame([['couplet', 'Un', 0,],], $this->storedSections($song));
+        $this->assertDatabaseMissing('song_sections', ['id' => $chorus,]);
+        $this->assertDatabaseCount('mass_song_sections', 1);
     }
 }

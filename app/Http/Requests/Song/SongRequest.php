@@ -13,30 +13,42 @@ use Illuminate\Validation\Rule;
  *
  * L'ordre de la liste est l'ordre des sections. Le numéro (Couplet 1, 2, 3) est saisi, facultatif et sans contrôle d'unicité.
  * Les sections ne sont pas obligatoires : un cantique peut être ajouté avant d'avoir ses paroles (point ouvert de KAN-38 :
- * au moins une section ?).
+ * au moins une section ?). À la modification, `sections` absent ou `null` laisse les sections inchangées, `[]` les supprime
+ * toutes (sauf celles qu'une messe utilise : 422).
  */
 abstract class SongRequest extends FormRequest
 {
+    // Bornes larges pour un cantique : un couplet ou une note tient en quelques lignes
+    private const SECTIONS_MAX_COUNT = 100;
+
+    private const SECTION_TEXT_MAX_LENGTH = 5000;
+
+    private const NOTES_MAX_LENGTH = 2000;
+
     public function rules(): array
     {
         return [
             'title'     => ['required', 'string', 'max:255',],
             'author'    => ['nullable', 'string', 'max:255',],
             'reference' => ['nullable', 'string', 'max:50',],
-            'notes'     => ['nullable', 'string',],
+            'notes'     => ['nullable', 'string', 'max:'.self::NOTES_MAX_LENGTH,],
 
-            'sections'        => ['nullable', 'array',],
-            'sections.*.id'   => $this->sectionIdRules(),
+            // Chaque section est une écriture en base (et une règle `exists` à la modification) : la liste est bornée
+            'sections'          => ['nullable', 'array', 'max:'.self::SECTIONS_MAX_COUNT,],
+            'sections.*.id'     => $this->sectionIdRules(),
             'sections.*.type'   => ['required', Rule::enum(SectionType::class),],
             'sections.*.number' => ['nullable', 'integer', 'min:1', 'max:999',],
-            'sections.*.text'   => ['required', 'string',],
+            'sections.*.text'   => ['required', 'string', 'max:'.self::SECTION_TEXT_MAX_LENGTH,],
         ];
     }
 
     public function messages(): array
     {
         return [
+            'notes.max'                => 'Les notes ne peuvent pas dépasser :max caractères.',
             'sections.array'           => 'Les sections doivent être envoyées sous forme de liste.',
+            'sections.max'             => 'Un cantique ne peut pas avoir plus de :max sections.',
+            'sections.*.text.max'      => 'Le texte d\'une section ne peut pas dépasser :max caractères.',
             'sections.*.id.integer'    => 'L\'identifiant de la section est invalide.',
             'sections.*.id.distinct'   => 'Une section ne peut pas apparaître deux fois dans la liste.',
             'sections.*.id.exists'     => 'Cette section n\'appartient pas à ce cantique.',
