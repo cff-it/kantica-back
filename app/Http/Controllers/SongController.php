@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Song\AttachSongToMassAction;
 use App\Actions\Song\CreateSongAction;
+use App\Actions\Song\DeleteSongAction;
 use App\Actions\Song\ListSongsAction;
 use App\Actions\Song\UpdateSongAction;
 use App\Http\Requests\Song\AttachSongToMassRequest;
@@ -48,10 +49,10 @@ class SongController extends Controller
         return SongResource::make($action($request->toDTO()));
     }
 
-    // Réservée à l'admin : DeleteSongRequest applique SongPolicy::delete
-    public function destroy(DeleteSongRequest $request, int $song, SongRepository $songs): JsonResponse
+    // Réservée à l'admin : DeleteSongRequest applique SongPolicy::delete au cantique, chargé une seule fois
+    public function destroy(DeleteSongRequest $request, DeleteSongAction $action): JsonResponse
     {
-        $songs->delete($songs->findById($song));
+        $action($request->song());
 
         return response()->json(null, 204);
     }

@@ -180,7 +180,7 @@ public function toDTO(): CheckInDTO
 
 | Module | Actions principales |
 |---|---|
-| **Répertoire chants** | `CreateSong`, `UpdateSong`, `AttachSongToMass`, `ListSongsAction` (`GET /api/songs`, KAN-18 : recherche par titre ou auteur, 20 par page) |
+| **Répertoire chants** | `CreateSong`, `UpdateSong`, `AttachSongToMass`, `ListSongsAction` (`GET /api/songs`, KAN-18 : recherche par titre ou auteur, 20 par page), `DeleteSongAction` (`DELETE /api/songs/{song}`, admin) |
 | **Liturgie messes** | `CreateMass`, `AssignSongToMassPart`, `GeneratePptx` |
 | **Membres & rôles** | `ListMembersAction` (`GET /api/members?search=&voice=&page=`, 20 par page, `page` bornée à 100 000 comme la liste des rôles : voir « Rôles (KAN-35) »), `CreateUser`, `AssignRole`, `AssignMassRole`, `AssignVoiceAction` (`PUT /api/members/{member}/voice`, KAN-34 : voix seule, 422 sans fiche, voix précise effacée si le groupe change) |
 | **Événements** | `CreateEvent`, `RegisterMember`, `CheckInMember` |
@@ -193,8 +193,9 @@ public function toDTO(): CheckInDTO
 - « Gestion des rôles » (US-25) : `ListUsersWithRolesAction` (`GET /api/users?search=&page=`, 20 par page, rôle de
   chaque compte et `meta.role_counts`) et `AssignRoleAction` (`PUT /api/users/{user}/role`, `{ role }`).
 - `page` est bornée à 100 000 dans `ListUsersRequest` et `ListMembersRequest` (422 « La page demandée est trop
-  grande. »), comme la liste du répertoire (KAN-18, pas encore dans `develop`) : sans borne, `PHP_INT_MAX` passait la
-  validation et le décalage de la page (`forPage`, `array_slice`) n'était plus un entier, d'où une erreur 500.
+  grande. »), comme `ListSongsRequest` (répertoire, KAN-18) : sans borne, `PHP_INT_MAX` passait la validation et le
+  décalage de la page (`forPage`, `array_slice`) n'était plus un entier, d'où une erreur 500. La borne et son message
+  sont écrits dans chaque FormRequest : une règle commune aux quatre listes reste à poser.
   **Vérifié** : `ManageRolesTest` et `ListMembersTest` (page 100 000 vide, 100 001 et `PHP_INT_MAX` refusées ; ces
   tests finissaient en 500 avant la borne), sous SQLite et PostgreSQL, et contre le back de dev (les deux routes).
 - Même borne pour l'historique des imports (`ListUsersImportsRequest`, `GET /api/users/import?page=`, paginé en SQL).
@@ -225,7 +226,7 @@ public function toDTO(): CheckInDTO
 - `search` : titre ou auteur, sans casse ni accents, tous les mots doivent se retrouver ; 100 caractères au plus. La
   référence et les paroles ne sont pas cherchées (champ « Titre ou auteur » de la maquette). `page` est bornée à 100 000 :
   sans borne, `PHP_INT_MAX` passait la validation et le décalage de la page (`forPage`) finissait en erreur 500. Les
-  listes des membres et des rôles n'ont pas encore cette borne.
+  listes des membres, des rôles et de l'historique des imports ont la même borne (voir « Rôles (KAN-35) »).
 - Réponse : `SongListItemResource` (`id`, `title`, `author`, `reference` : ce que la liste affiche, comme
   `MemberListItemResource`), lue par `SongRepository::allForList()` (ces seules colonnes, sans tri SQL) ; le cantique complet
   reste servi par `SongResource`. `meta.total` suit la recherche, `meta.songs_count` (« 13 cantiques ») porte sur tout le
@@ -233,8 +234,10 @@ public function toDTO(): CheckInDTO
 - Accès : `SongPolicy::viewAny`, sur la route, ouvert aux trois rôles (membre, secrétaire, admin) ; un compte sans rôle
   reçoit un 403, un compte en attente le 403 `ACCOUNT_PENDING_VALIDATION` du middleware `account.active`.
 - Autres routes `/api/songs` (relevé par la revue de KAN-18) : `DELETE /{song}` est **réservé à l'admin** par
-  `DeleteSongRequest` (`SongPolicy::delete`, cantique chargé pour la Policy, 404 s'il n'existe pas) ; avant, tout compte
-  validé pouvait supprimer un cantique. `POST` et `PUT` passent par la Policy dans les FormRequests de KAN-38 (PR de Kevin,
+  `DeleteSongRequest` (`SongPolicy::delete`) ; avant, tout compte validé pouvait supprimer un cantique. La requête charge
+  le cantique pour la Policy et le passe à `DeleteSongAction`, qui le supprime sans le relire (un seul `select`). Le 404
+  d'un cantique inconnu précède la Policy pour tous les rôles, comme pour la modification (KAN-38) : voulu, la liste
+  étant lisible par tous, il ne révèle rien. `POST` et `PUT` passent par la Policy dans les FormRequests de KAN-38 (PR de Kevin,
   non fusionnée au 27 novembre 2026 : sur `develop`, leur `authorize()` renvoie encore `true`, tout compte validé peut donc
   créer ou modifier un cantique tant qu'elle n'est pas fusionnée). `GET /{song}` n'a pas de contrôle de rôle : à poser avec
   la fiche (KAN-25). `AttachSongToMassRequest` et `SongController::attach` n'ont aucune route (code mort).
@@ -246,8 +249,9 @@ public function toDTO(): CheckInDTO
   thème), tant que l'ajout d'un cantique (KAN-13) n'existe pas. Lancé à la main, jamais par `app:deploy` ; relancé, il ne
   crée que les titres absents et ne touche à aucun autre cantique. Requête Bruno `songs/list`.
 - **Vérifié** : `ListSongsTest` (29 tests, dont « œ », un cantique sans auteur, le jeu de démonstration et la page trop
-  grande), `DeleteSongTest` (5 tests), suite complète sous SQLite et sous PostgreSQL, appels réels sur la base de dev avec
-  un compte membre (tri, recherche sans accents, compteur, 422, 401). **Non vérifié** : la préprod Railway, où le jeu de
+  grande), `DeleteSongTest` (8 tests, dont le 404 pour tous les rôles et une seule lecture du cantique), suite complète
+  sous SQLite et sous PostgreSQL, appels réels sur la base de dev avec un compte membre (tri, recherche sans accents,
+  compteur, 422, 401) et une suppression réelle par l'admin. **Non vérifié** : la préprod Railway, où le jeu de
   démonstration n'a pas été chargé.
 
 ## Conventions de nommage
