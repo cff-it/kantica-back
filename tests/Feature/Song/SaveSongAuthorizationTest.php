@@ -87,6 +87,7 @@ class SaveSongAuthorizationTest extends TestCase
         $this->actingAsRole(RoleName::Admin);
 
         $this->putJson('/api/songs/999', ['title' => 'Modifié',])->assertNotFound();
+        $this->putJson('/api/songs/abc', ['title' => 'Modifié',])->assertNotFound();
     }
 
     public function test_a_guest_cannot_create_nor_update_a_song(): void

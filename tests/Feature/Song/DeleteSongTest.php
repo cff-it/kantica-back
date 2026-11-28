@@ -80,6 +80,14 @@ class DeleteSongTest extends TestCase
         $this->deleteJson('/api/songs/999')->assertNotFound();
     }
 
+    // whereNumber sur la route : sans lui, `abc` arrivait dans le paramètre `int $song` du contrôleur (erreur 500)
+    public function test_a_non_numeric_id_is_not_found(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Admin));
+
+        $this->deleteJson('/api/songs/abc')->assertNotFound();
+    }
+
     // Relevé par la revue de KAN-18 : DeleteSongAction charge le cantique une seule fois avant de le supprimer
     public function test_the_song_is_read_once(): void
     {

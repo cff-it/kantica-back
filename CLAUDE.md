@@ -242,8 +242,9 @@ public function toDTO(): CheckInDTO
   le droit n'en dépend pas ; un appel avec le cantique (`can('update', $song)` dans les FormRequests de KAN-38, PR de
   Kevin non fusionnée au 28 novembre 2026) reste accepté, PHP ignorant l'argument en plus. Ces FormRequests contrôleront
   une seconde fois : à unifier à leur fusion. `authorize()` de `CreateSongRequest` et `UpdateSongRequest` reste à `true`
-  ici, KAN-38 les réécrit ; les tests HTTP échouent si le contrôle de la route disparaît. KAN-38 modifie les mêmes lignes de
-  `routes/api.php` (`whereNumber`) : conflit simple, garder `whereNumber` et `can`.
+  ici, KAN-38 les réécrit ; les tests HTTP échouent si le contrôle de la route disparaît. Les routes `/{song}` ont
+  `whereNumber('song')` : un identifiant non numérique donne un 404 au lieu d'une erreur 500 sur le paramètre `int` du
+  contrôleur. KAN-38 ajoute le même `whereNumber` sur ces lignes : en cas de conflit, garder `whereNumber` et `can`.
 - Suppression : `DeleteSongAction` reçoit l'identifiant, lit le cantique une seule fois (404 s'il n'existe pas, pour
   l'admin) et le supprime par le modèle, pour que les événements Eloquent (et les sections de KAN-38) suivent ; une
   suppression directe par identifiant éviterait la lecture mais les court-circuiterait. Le rôle « responsable » que citait `SongPolicy` n'existe pas : règle effective inchangée.
@@ -256,8 +257,9 @@ public function toDTO(): CheckInDTO
   thème), tant que l'ajout d'un cantique (KAN-13) n'existe pas. Lancé à la main, jamais par `app:deploy` ; relancé, il ne
   crée que les titres absents et ne touche à aucun autre cantique. Requête Bruno `songs/list`.
 - **Vérifié** : `ListSongsTest` (29 tests, dont « œ », un cantique sans auteur, le jeu de démonstration et la page trop
-  grande), `DeleteSongTest` (9 tests, dont le 403 avant le 404 et une seule lecture du cantique), `ShowSongTest`
-  (7 tests), `SaveSongAuthorizationTest` (10 tests : admin, autres rôles, sans rôle, invité, compte en attente), suite
+  grande), `DeleteSongTest` (10 tests, dont le 403 avant le 404, l'identifiant non numérique et une seule lecture du
+  cantique), `ShowSongTest` (8 tests, dont la Policy appelée avec le cantique), `SaveSongAuthorizationTest` (10 tests :
+  admin, autres rôles, sans rôle, invité, compte en attente), suite
   complète sous SQLite et sous PostgreSQL, appels réels sur la base de dev avec un compte membre (tri, recherche sans
   accents, compteur, 422, 401) et avec l'admin (suppressions 204, cantique inconnu 404, lecture d'un cantique 200).
   **Non vérifié** : la préprod Railway, où le jeu de démonstration n'a pas été chargé.

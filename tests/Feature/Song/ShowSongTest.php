@@ -64,6 +64,29 @@ class ShowSongTest extends TestCase
         Sanctum::actingAs($user);
 
         $this->getJson('/api/songs/999')->assertNotFound();
+        $this->getJson('/api/songs/abc')->assertNotFound();
+    }
+
+    // SongPolicy ne prend pas le cantique (aucun droit n'en dépend), mais un appel avec le cantique, comme dans les
+    // FormRequests de KAN-38 ou la future fiche (KAN-25), doit donner la même réponse
+    public function test_the_policy_gives_the_same_answer_with_a_song_instance(): void
+    {
+        $song = Song::create(['title' => 'Adeste fideles',]);
+        $admin = User::factory()->create();
+        $admin->assignRole(RoleName::Admin->value);
+        $member = User::factory()->create();
+        $member->assignRole(RoleName::Member->value);
+        $withoutRole = User::factory()->create();
+
+        $this->assertTrue($member->can('view', $song));
+        $this->assertFalse($withoutRole->can('view', $song));
+
+        foreach (['update', 'delete',] as $ability) {
+            $this->assertTrue($admin->can($ability, $song));
+            $this->assertFalse($member->can($ability, $song));
+            $this->assertTrue($admin->can($ability, Song::class));
+            $this->assertFalse($member->can($ability, Song::class));
+        }
     }
 
     public function test_a_guest_cannot_read_a_song(): void
