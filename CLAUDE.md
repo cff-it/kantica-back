@@ -245,7 +245,8 @@ public function toDTO(): CheckInDTO
   ici, KAN-38 les réécrit ; les tests HTTP échouent si le contrôle de la route disparaît. KAN-38 modifie les mêmes lignes de
   `routes/api.php` (`whereNumber`) : conflit simple, garder `whereNumber` et `can`.
 - Suppression : `DeleteSongAction` reçoit l'identifiant, lit le cantique une seule fois (404 s'il n'existe pas, pour
-  l'admin) et le supprime. Le rôle « responsable » que citait `SongPolicy` n'existe pas : règle effective inchangée.
+  l'admin) et le supprime par le modèle, pour que les événements Eloquent (et les sections de KAN-38) suivent ; une
+  suppression directe par identifiant éviterait la lecture mais les court-circuiterait. Le rôle « responsable » que citait `SongPolicy` n'existe pas : règle effective inchangée.
   `AttachSongToMassRequest` et `SongController::attach` n'ont aucune route (code mort).
 - Thèmes liturgiques (filtre `?theme=`, couleur) : reportés à KAN-23, dont le modèle n'est pas tranché (un ou plusieurs
   thèmes par cantique, liste fixe ou administrable, couleurs).
