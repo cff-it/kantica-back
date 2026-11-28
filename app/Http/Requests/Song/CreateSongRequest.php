@@ -3,13 +3,16 @@
 namespace App\Http\Requests\Song;
 
 use App\DTOs\Song\CreateSongDTO;
+use App\Models\Song;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CreateSongRequest extends FormRequest
 {
+    // Second contrôle du rôle (admin, SongPolicy::create), après celui de la route : défense en profondeur si la route
+    // perdait son `->can`. Avec la classe, sans charger le cantique
     public function authorize(): bool
     {
-        return true;
+        return $this->user()->can('create', Song::class);
     }
 
     public function rules(): array
