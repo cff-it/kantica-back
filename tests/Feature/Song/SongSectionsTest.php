@@ -351,11 +351,12 @@ class SongSectionsTest extends TestCase
             ['id' => $verse, 'type' => 'couplet', 'number' => 1, 'text' => 'Un'],
             ['id' => $chorus, 'type' => 'refrain', 'text' => 'Deux modifié'],
         ]))->assertOk();
-        $updates = collect(DB::getQueryLog())
-            ->filter(fn (array $query) => str_contains($query['query'], 'update "song_sections"'));
+        $queries = collect(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $this->assertCount(1, $updates);
+        $this->assertCount(1, $queries->filter(fn (array $query) => str_contains($query['query'], 'update "song_sections"')));
+        // Aucune section retirée de la liste : pas de DELETE inutile
+        $this->assertCount(0, $queries->filter(fn (array $query) => str_contains($query['query'], 'delete from "song_sections"')));
         $this->assertSame([['couplet', 'Un', 0,], ['refrain', 'Deux modifié', 1,],], $this->storedSections($song));
     }
 
@@ -661,6 +662,17 @@ class SongSectionsTest extends TestCase
         $this->putJson('/api/songs/abc', $this->payload([]))->assertNotFound();
         $this->getJson('/api/songs/abc')->assertNotFound();
         $this->deleteJson('/api/songs/abc')->assertNotFound();
+    }
+
+    // Le cantique est lu avant la validation : un cantique inconnu donne 404, même avec des sections invalides (pas 422)
+    public function test_an_unknown_song_returns_not_found_even_with_invalid_sections(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->putJson('/api/songs/99999', $this->payload([['type' => 'strophe', 'text' => '',],]))
+            ->assertNotFound();
+        $this->putJson('/api/songs/99999', $this->payload([['id' => 1, 'type' => 'couplet', 'text' => 'Un',],]))
+            ->assertNotFound();
     }
 
     // ── Section utilisée dans l'ordre d'une messe (US-18) ───────────────────

@@ -61,6 +61,11 @@ class SongSectionRepository
      */
     public function deleteByIds(Song $song, array $ids): void
     {
+        // Rien à supprimer à chaque modification qui garde toutes les sections : pas de requête
+        if ($ids === []) {
+            return;
+        }
+
         $song->sections()->whereIn('id', $ids)->delete();
     }
 }
