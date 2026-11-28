@@ -14,23 +14,26 @@ class SongPolicy
         return $user->hasRole([RoleName::Admin->value, RoleName::Secretary->value, RoleName::Member->value,]);
     }
 
+    // Même règle que la liste : la route `GET /songs/{song}` l'applique avec `viewAny`, sans charger le cantique
     public function view(User $user, Song $song): bool
     {
-        return true;
+        return $this->viewAny($user);
     }
 
+    // Ajout et modification réservés à l'admin (bouton « + Ajouter », KAN-13). Le rôle « responsable », cité ici
+    // auparavant, n'existe pas (RoleName) : la règle effective reste la même
     public function create(User $user): bool
     {
-        return $user->hasRole(['admin', 'responsable']);
+        return $user->hasRole(RoleName::Admin->value);
     }
 
     public function update(User $user, Song $song): bool
     {
-        return $user->hasRole(['admin', 'responsable']);
+        return $user->hasRole(RoleName::Admin->value);
     }
 
     public function delete(User $user, Song $song): bool
     {
-        return $user->hasRole('admin');
+        return $user->hasRole(RoleName::Admin->value);
     }
 }

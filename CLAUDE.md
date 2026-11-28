@@ -237,10 +237,15 @@ public function toDTO(): CheckInDTO
   `DeleteSongRequest` (`SongPolicy::delete`) ; avant, tout compte validé pouvait supprimer un cantique. La requête charge
   le cantique pour la Policy et le passe à `DeleteSongAction`, qui le supprime sans le relire (un seul `select`). Le 404
   d'un cantique inconnu précède la Policy pour tous les rôles, comme pour la modification (KAN-38) : voulu, la liste
-  étant lisible par tous, il ne révèle rien. `POST` et `PUT` passent par la Policy dans les FormRequests de KAN-38 (PR de Kevin,
-  non fusionnée au 27 novembre 2026 : sur `develop`, leur `authorize()` renvoie encore `true`, tout compte validé peut donc
-  créer ou modifier un cantique tant qu'elle n'est pas fusionnée). `GET /{song}` n'a pas de contrôle de rôle : à poser avec
-  la fiche (KAN-25). `AttachSongToMassRequest` et `SongController::attach` n'ont aucune route (code mort).
+  étant lisible par tous, il ne révèle rien.
+- `GET /{song}` exige le même droit que la liste (`->can('viewAny', Song::class)` sur la route, `SongPolicy::view`
+  aligné) : un compte sans rôle reçoit un 403, avant tout 404 (relevé par la deuxième revue de KAN-18 ; avant, il
+  pouvait lire chaque cantique par son identifiant). `ShowSongTest` le couvre.
+- `POST` et `PUT` passent par la Policy dans les FormRequests de KAN-38 (PR de Kevin, non fusionnée au 28 novembre
+  2026 : sur `develop`, leur `authorize()` renvoie encore `true`, tout compte validé peut donc créer ou modifier un
+  cantique tant qu'elle n'est pas fusionnée). `SongPolicy::create` et `update` réservent ces actions à l'admin
+  (`RoleName::Admin`) ; ils citaient un rôle « responsable » qui n'existe pas, la règle effective est inchangée.
+  `AttachSongToMassRequest` et `SongController::attach` n'ont aucune route (code mort).
 - Thèmes liturgiques (filtre `?theme=`, couleur) : reportés à KAN-23, dont le modèle n'est pas tranché (un ou plusieurs
   thèmes par cantique, liste fixe ou administrable, couleurs).
 - `Song::uniqueIds()` renvoie `['uuid']` : sans lui, `HasUuids` écrivait l'UUID dans `id` (bigint) et toute création de
@@ -249,10 +254,10 @@ public function toDTO(): CheckInDTO
   thème), tant que l'ajout d'un cantique (KAN-13) n'existe pas. Lancé à la main, jamais par `app:deploy` ; relancé, il ne
   crée que les titres absents et ne touche à aucun autre cantique. Requête Bruno `songs/list`.
 - **Vérifié** : `ListSongsTest` (29 tests, dont « œ », un cantique sans auteur, le jeu de démonstration et la page trop
-  grande), `DeleteSongTest` (8 tests, dont le 404 pour tous les rôles et une seule lecture du cantique), suite complète
-  sous SQLite et sous PostgreSQL, appels réels sur la base de dev avec un compte membre (tri, recherche sans accents,
-  compteur, 422, 401) et une suppression réelle par l'admin. **Non vérifié** : la préprod Railway, où le jeu de
-  démonstration n'a pas été chargé.
+  grande), `DeleteSongTest` (8 tests, dont le 404 pour tous les rôles et une seule lecture du cantique), `ShowSongTest`
+  (6 tests), suite complète sous SQLite et sous PostgreSQL, appels réels sur la base de dev avec un compte membre (tri,
+  recherche sans accents, compteur, 422, 401), des suppressions réelles par l'admin (204) et la lecture d'un cantique par
+  l'admin (200). **Non vérifié** : la préprod Railway, où le jeu de démonstration n'a pas été chargé.
 
 ## Conventions de nommage
 

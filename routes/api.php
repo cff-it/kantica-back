@@ -80,7 +80,9 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
         Route::get('/', [SongController::class, 'index'])
             ->can('viewAny', Song::class);
         Route::post('/', [SongController::class, 'store']);
-        Route::get('/{song}', [SongController::class, 'show']);
+        // Un cantique se lit avec le même droit que la liste : un compte sans rôle reçoit un 403, avant tout 404
+        Route::get('/{song}', [SongController::class, 'show'])
+            ->can('viewAny', Song::class);
         Route::put('/{song}', [SongController::class, 'update']);
         Route::delete('/{song}', [SongController::class, 'destroy']);
     });
