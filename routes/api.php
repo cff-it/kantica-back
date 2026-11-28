@@ -79,8 +79,9 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
         // Répertoire (KAN-18, US-04) : `?search=` (titre ou auteur) et `?page=`
         Route::get('/', [SongController::class, 'index'])
             ->can('viewAny', Song::class);
-        // Ajout et modification réservés à l'admin, contrôlés sur la route (avec la classe : 403 avant tout 404) en
-        // attendant les FormRequests de KAN-38 ; avant, tout compte validé pouvait créer ou modifier un cantique
+        // Chaque route contrôle le rôle elle-même, avec la classe (403 avant tout 404) : lecture pour les trois rôles,
+        // ajout, modification et suppression pour l'admin (KAN-13). Avant, tout compte validé pouvait écrire ; les
+        // FormRequests de KAN-38 contrôleront aussi le cantique, à unifier à leur fusion
         Route::post('/', [SongController::class, 'store'])
             ->can('create', Song::class);
         // Un cantique se lit avec le même droit que la liste : un compte sans rôle reçoit un 403, avant tout 404
@@ -88,7 +89,8 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
             ->can('viewAny', Song::class);
         Route::put('/{song}', [SongController::class, 'update'])
             ->can('update', Song::class);
-        Route::delete('/{song}', [SongController::class, 'destroy']);
+        Route::delete('/{song}', [SongController::class, 'destroy'])
+            ->can('delete', Song::class);
     });
 
     // ── Liturgie messes ─────────────────────────────────────────────────

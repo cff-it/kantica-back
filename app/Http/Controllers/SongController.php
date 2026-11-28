@@ -9,7 +9,6 @@ use App\Actions\Song\ListSongsAction;
 use App\Actions\Song\UpdateSongAction;
 use App\Http\Requests\Song\AttachSongToMassRequest;
 use App\Http\Requests\Song\CreateSongRequest;
-use App\Http\Requests\Song\DeleteSongRequest;
 use App\Http\Requests\Song\ListSongsRequest;
 use App\Http\Requests\Song\UpdateSongRequest;
 use App\Http\Resources\MassPartResource;
@@ -49,10 +48,10 @@ class SongController extends Controller
         return SongResource::make($action($request->toDTO()));
     }
 
-    // Réservée à l'admin : DeleteSongRequest applique SongPolicy::delete au cantique, chargé une seule fois
-    public function destroy(DeleteSongRequest $request, DeleteSongAction $action): JsonResponse
+    // Réservée à l'admin : la route applique SongPolicy::delete, avant tout 404
+    public function destroy(int $song, DeleteSongAction $action): JsonResponse
     {
-        $action($request->song());
+        $action($song);
 
         return response()->json(null, 204);
     }

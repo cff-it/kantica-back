@@ -3,6 +3,7 @@
 namespace Tests\Feature\Song;
 
 use App\Enums\RoleName;
+use App\Http\Middleware\EnsureAccountIsActive;
 use App\Models\Song;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
@@ -12,8 +13,8 @@ use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
-// DELETE /api/songs/{song} : réservé à l'admin (DeleteSongRequest, SongPolicy::delete). Relevé par la revue de KAN-18 :
-// la route n'avait aucun contrôle de rôle
+// DELETE /api/songs/{song} : réservé à l'admin (SongPolicy::delete, sur la route). Relevé par la revue de KAN-18 : la
+// route n'avait aucun contrôle de rôle
 class DeleteSongTest extends TestCase
 {
     use RefreshDatabase;
@@ -62,27 +63,24 @@ class DeleteSongTest extends TestCase
         ];
     }
 
-    // Voulu : le cantique est chargé avant la Policy, comme pour la modification (KAN-38). Un membre reçoit donc un 404
-    // pour un cantique inconnu et un 403 pour un cantique existant, sans rien révéler : la liste est lisible par tous
-    #[DataProvider('allRoles')]
-    public function test_an_unknown_song_is_not_found_whatever_the_role(RoleName $role): void
+    // Le rôle est contrôlé sur la route, avec la classe : un autre rôle reçoit un 403 même pour un cantique inconnu,
+    // comme pour la lecture, l'ajout et la modification ; l'admin, lui, reçoit le 404
+    #[DataProvider('otherRoles')]
+    public function test_the_role_is_checked_before_the_song_exists(RoleName $role): void
     {
         Sanctum::actingAs($this->userWithRole($role));
+
+        $this->deleteJson('/api/songs/999')->assertForbidden();
+    }
+
+    public function test_an_unknown_song_is_not_found_for_an_admin(): void
+    {
+        Sanctum::actingAs($this->userWithRole(RoleName::Admin));
 
         $this->deleteJson('/api/songs/999')->assertNotFound();
     }
 
-    public static function allRoles(): array
-    {
-        return [
-            'admin'      => [RoleName::Admin,],
-            'membre'     => [RoleName::Member,],
-            'secrétaire' => [RoleName::Secretary,],
-        ];
-    }
-
-    // Relevé par la revue de KAN-18 : la requête charge le cantique pour la Policy, et DeleteSongAction le supprime sans
-    // le relire
+    // Relevé par la revue de KAN-18 : DeleteSongAction charge le cantique une seule fois avant de le supprimer
     public function test_the_song_is_read_once(): void
     {
         $song = Song::create(['title' => 'Adeste fideles',]);
@@ -104,6 +102,20 @@ class DeleteSongTest extends TestCase
         $song = Song::create(['title' => 'Adeste fideles',]);
 
         $this->deleteJson("/api/songs/{$song->id}")->assertUnauthorized();
+
+        $this->assertModelExists($song);
+    }
+
+    public function test_a_pending_admin_cannot_delete_a_song(): void
+    {
+        $song = Song::create(['title' => 'Adeste fideles',]);
+        $pending = User::factory()->pending()->create();
+        $pending->assignRole(RoleName::Admin->value);
+        Sanctum::actingAs($pending);
+
+        $this->deleteJson("/api/songs/{$song->id}")
+            ->assertForbidden()
+            ->assertJsonPath('code', EnsureAccountIsActive::ERROR_CODE);
 
         $this->assertModelExists($song);
     }

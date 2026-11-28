@@ -34,7 +34,8 @@ class SongPolicy
         return $user->hasRole(RoleName::Admin->value);
     }
 
-    public function delete(User $user, Song $song): bool
+    // Appelée avec la classe par la route, avant tout 404
+    public function delete(User $user, ?Song $song = null): bool
     {
         return $user->hasRole(RoleName::Admin->value);
     }

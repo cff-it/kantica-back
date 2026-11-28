@@ -3,6 +3,7 @@
 namespace Tests\Feature\Song;
 
 use App\Enums\RoleName;
+use App\Http\Middleware\EnsureAccountIsActive;
 use App\Models\Song;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
@@ -70,5 +71,17 @@ class ShowSongTest extends TestCase
         $song = Song::create(['title' => 'Adeste fideles',]);
 
         $this->getJson("/api/songs/{$song->id}")->assertUnauthorized();
+    }
+
+    public function test_a_pending_member_cannot_read_a_song(): void
+    {
+        $song = Song::create(['title' => 'Adeste fideles',]);
+        $pending = User::factory()->pending()->create();
+        $pending->assignRole(RoleName::Member->value);
+        Sanctum::actingAs($pending);
+
+        $this->getJson("/api/songs/{$song->id}")
+            ->assertForbidden()
+            ->assertJsonPath('code', EnsureAccountIsActive::ERROR_CODE);
     }
 }

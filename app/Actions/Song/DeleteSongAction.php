@@ -2,17 +2,16 @@
 
 namespace App\Actions\Song;
 
-use App\Models\Song;
 use App\Repositories\SongRepository;
 
-// Suppression d'un cantique, réservée à l'admin (DeleteSongRequest). Le cantique arrive déjà chargé par la requête,
-// qui en a besoin pour la Policy : il n'est pas relu ici
+// Suppression d'un cantique, réservée à l'admin (SongPolicy::delete, contrôlé sur la route avant tout 404). Le cantique
+// n'est lu qu'une fois : 404 s'il n'existe pas
 readonly class DeleteSongAction
 {
     public function __construct(private SongRepository $songs) {}
 
-    public function __invoke(Song $song): void
+    public function __invoke(int $songId): void
     {
-        $this->songs->delete($song);
+        $this->songs->delete($this->songs->findById($songId));
     }
 }

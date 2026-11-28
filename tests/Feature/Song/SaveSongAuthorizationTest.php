@@ -3,6 +3,7 @@
 namespace Tests\Feature\Song;
 
 use App\Enums\RoleName;
+use App\Http\Middleware\EnsureAccountIsActive;
 use App\Models\Song;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
@@ -88,8 +89,33 @@ class SaveSongAuthorizationTest extends TestCase
         $this->putJson('/api/songs/999', ['title' => 'Modifié',])->assertNotFound();
     }
 
-    public function test_a_guest_cannot_create_a_song(): void
+    public function test_a_guest_cannot_create_nor_update_a_song(): void
     {
-        $this->postJson('/api/songs', ['title' => 'Adeste fideles',])->assertUnauthorized();
+        $song = Song::create(['title' => 'Adeste fideles',]);
+
+        $this->postJson('/api/songs', ['title' => 'Nouveau',])->assertUnauthorized();
+        $this->putJson("/api/songs/{$song->id}", ['title' => 'Modifié',])->assertUnauthorized();
+
+        $this->assertDatabaseCount('songs', 1);
+        $this->assertSame('Adeste fideles', $song->fresh()->title);
+    }
+
+    // Le compte doit aussi être validé : un admin en attente est refusé par le middleware `account.active`
+    public function test_a_pending_admin_cannot_create_nor_update_a_song(): void
+    {
+        $song = Song::create(['title' => 'Adeste fideles',]);
+        $pending = User::factory()->pending()->create();
+        $pending->assignRole(RoleName::Admin->value);
+        Sanctum::actingAs($pending);
+
+        $this->postJson('/api/songs', ['title' => 'Nouveau',])
+            ->assertForbidden()
+            ->assertJsonPath('code', EnsureAccountIsActive::ERROR_CODE);
+        $this->putJson("/api/songs/{$song->id}", ['title' => 'Modifié',])
+            ->assertForbidden()
+            ->assertJsonPath('code', EnsureAccountIsActive::ERROR_CODE);
+
+        $this->assertDatabaseCount('songs', 1);
+        $this->assertSame('Adeste fideles', $song->fresh()->title);
     }
 }

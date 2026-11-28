@@ -233,20 +233,17 @@ public function toDTO(): CheckInDTO
   répertoire. Recherche et tri passent par `Str::ascii` : « Cœur » se lit « coeur », « Æterna » « aeterna ».
 - Accès : `SongPolicy::viewAny`, sur la route, ouvert aux trois rôles (membre, secrétaire, admin) ; un compte sans rôle
   reçoit un 403, un compte en attente le 403 `ACCOUNT_PENDING_VALIDATION` du middleware `account.active`.
-- Autres routes `/api/songs` (relevé par la revue de KAN-18) : `DELETE /{song}` est **réservé à l'admin** par
-  `DeleteSongRequest` (`SongPolicy::delete`) ; avant, tout compte validé pouvait supprimer un cantique. La requête charge
-  le cantique pour la Policy et le passe à `DeleteSongAction`, qui le supprime sans le relire (un seul `select`). Le 404
-  d'un cantique inconnu précède la Policy pour tous les rôles, comme pour la modification (KAN-38) : voulu, la liste
-  étant lisible par tous, il ne révèle rien.
-- `GET /{song}` exige le même droit que la liste (`->can('viewAny', Song::class)` sur la route, `SongPolicy::view`
-  aligné) : un compte sans rôle reçoit un 403, avant tout 404 (relevé par la deuxième revue de KAN-18 ; avant, il
-  pouvait lire chaque cantique par son identifiant). `ShowSongTest` le couvre.
-- `POST` et `PUT` sont **réservés à l'admin** sur la route (`->can('create', Song::class)`, `->can('update', Song::class)` :
-  403 avant tout 404), en attendant les FormRequests de KAN-38 (PR de Kevin, non fusionnée au 28 novembre 2026) ; avant,
-  tout compte validé, même sans rôle, pouvait créer ou modifier un cantique. `SongPolicy::create` et `update` utilisent
-  `RoleName::Admin` (ils citaient un rôle « responsable » inexistant) ; `update` accepte le cantique en option : la route
-  l'appelle avec la classe, la FormRequest de KAN-38 avec le cantique. `SaveSongAuthorizationTest` (9 tests) le couvre.
-  KAN-38 modifie les mêmes lignes de `routes/api.php` (`whereNumber`) : conflit simple à résoudre en gardant les deux.
+- Droits des autres routes `/api/songs` (relevés par les revues de KAN-18) : chaque route contrôle le rôle elle-même
+  avec la classe (`->can(..., Song::class)`), donc **403 avant tout 404**. `GET /{song}` : même droit que la liste
+  (`viewAny`, `SongPolicy::view` aligné). `POST /`, `PUT /{song}` et `DELETE /{song}` : **admin seulement**
+  (`create`, `update`, `delete` avec `RoleName::Admin` ; KAN-13 : « Un utilisateur non admin ne peut pas créer de
+  cantique », modification « uniquement pour l'Admin »). Avant, un compte sans rôle pouvait lire chaque cantique, et tout
+  compte validé pouvait en créer, modifier ou supprimer. `update` et `delete` acceptent le cantique en option : appel par
+  la classe sur la route, et avec le cantique dans les FormRequests de KAN-38 (PR de Kevin, non fusionnée au 28 novembre
+  2026), qui contrôleront donc une seconde fois : à unifier à leur fusion. KAN-38 modifie les mêmes lignes de
+  `routes/api.php` (`whereNumber`) : conflit simple, garder `whereNumber` et `can`.
+- Suppression : `DeleteSongAction` reçoit l'identifiant, lit le cantique une seule fois (404 s'il n'existe pas, pour
+  l'admin) et le supprime. Le rôle « responsable » que citait `SongPolicy` n'existe pas : règle effective inchangée.
   `AttachSongToMassRequest` et `SongController::attach` n'ont aucune route (code mort).
 - Thèmes liturgiques (filtre `?theme=`, couleur) : reportés à KAN-23, dont le modèle n'est pas tranché (un ou plusieurs
   thèmes par cantique, liste fixe ou administrable, couleurs).
@@ -256,10 +253,11 @@ public function toDTO(): CheckInDTO
   thème), tant que l'ajout d'un cantique (KAN-13) n'existe pas. Lancé à la main, jamais par `app:deploy` ; relancé, il ne
   crée que les titres absents et ne touche à aucun autre cantique. Requête Bruno `songs/list`.
 - **Vérifié** : `ListSongsTest` (29 tests, dont « œ », un cantique sans auteur, le jeu de démonstration et la page trop
-  grande), `DeleteSongTest` (8 tests, dont le 404 pour tous les rôles et une seule lecture du cantique), `ShowSongTest`
-  (6 tests), suite complète sous SQLite et sous PostgreSQL, appels réels sur la base de dev avec un compte membre (tri,
-  recherche sans accents, compteur, 422, 401), des suppressions réelles par l'admin (204) et la lecture d'un cantique par
-  l'admin (200). **Non vérifié** : la préprod Railway, où le jeu de démonstration n'a pas été chargé.
+  grande), `DeleteSongTest` (9 tests, dont le 403 avant le 404 et une seule lecture du cantique), `ShowSongTest`
+  (7 tests), `SaveSongAuthorizationTest` (10 tests : admin, autres rôles, sans rôle, invité, compte en attente), suite
+  complète sous SQLite et sous PostgreSQL, appels réels sur la base de dev avec un compte membre (tri, recherche sans
+  accents, compteur, 422, 401) et avec l'admin (suppressions 204, cantique inconnu 404, lecture d'un cantique 200).
+  **Non vérifié** : la préprod Railway, où le jeu de démonstration n'a pas été chargé.
 
 ## Conventions de nommage
 
