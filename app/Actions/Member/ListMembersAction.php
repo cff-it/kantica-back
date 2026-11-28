@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\VoiceGroup;
 use App\Repositories\MemberRepository;
 use App\Repositories\VoiceRepository;
+use App\Support\MemberSortKey;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
@@ -38,7 +39,7 @@ readonly class ListMembersAction
             ->when(filled($dto->search), fn (Collection $members) => $members->filter(
                 fn (User $member) => $this->matches($member, $dto->search),
             ))
-            ->sortBy(fn (User $member) => $this->sortKey($member))
+            ->sortBy(fn (User $member) => MemberSortKey::of($member))
             ->values();
 
         $page = new LengthAwarePaginator(
@@ -68,17 +69,6 @@ readonly class ListMembersAction
         $terms = preg_split('/\s+/', $this->normalize($search), -1, PREG_SPLIT_NO_EMPTY);
 
         return collect($terms)->every(fn (string $term) => str_contains($haystack, $term));
-    }
-
-    // Tri par nom puis prénom, sans tenir compte de la casse ni des accents ; les fiches sans nom en dernier
-    private function sortKey(User $member): array
-    {
-        return [
-            blank($member->last_name) ? 1 : 0,
-            $this->normalize((string) $member->last_name),
-            $this->normalize($member->firstnames->pluck('first_name')->implode(' ')),
-            $member->id,
-        ];
     }
 
     private function fullName(User $member): string

@@ -4,10 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Actions\Event\CheckInMemberAction;
 use App\Actions\Event\CreateEventAction;
+use App\Actions\Event\ListEventAttendancesAction;
+use App\Actions\Event\RecordAttendancesAction;
 use App\Actions\Event\SubscribeToEventAction;
 use App\Http\Requests\Event\CheckInRequest;
 use App\Http\Requests\Event\CreateEventRequest;
+use App\Http\Requests\Event\RecordAttendancesRequest;
 use App\Http\Requests\Event\SubscribeToEventRequest;
+use App\Http\Resources\EventAttendanceResource;
 use App\Http\Resources\EventResource;
 use App\Repositories\EventRepository;
 use Illuminate\Http\JsonResponse;
@@ -44,5 +48,16 @@ class EventController extends Controller
         $check = $action($request->toDTO());
 
         return response()->json($check, 201);
+    }
+
+    // Identifiant brut (pas de route model binding) : le refus 403 de la route passe avant tout 404
+    public function attendances(int $event, ListEventAttendancesAction $action): EventAttendanceResource
+    {
+        return EventAttendanceResource::make($action($event));
+    }
+
+    public function recordAttendances(RecordAttendancesRequest $request, RecordAttendancesAction $action): EventAttendanceResource
+    {
+        return EventAttendanceResource::make($action($request->toDTO()));
     }
 }

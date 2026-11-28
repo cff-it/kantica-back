@@ -10,6 +10,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\SongController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserImportController;
+use App\Models\Event;
 use App\Models\Song;
 use App\Models\User;
 use App\Models\UserProfile;
@@ -142,6 +143,14 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
         Route::get('/{event}', [EventController::class, 'show']);
         Route::post('/{event}/subscribe', [EventController::class, 'subscribe']);
         Route::post('/{event}/check-in', [EventController::class, 'checkIn']);
+        // Saisie des présences (KAN-12, US-11) : Secrétaire et Admin. Policy appelée avec la classe, sans événement : le
+        // refus 403 passe avant tout 404 ; `{event}` limité à 18 chiffres (sous PHP_INT_MAX), comme `{song}`
+        Route::get('/{event}/attendances', [EventController::class, 'attendances'])
+            ->where('event', '[0-9]{1,18}')
+            ->can('manageAttendances', Event::class);
+        Route::put('/{event}/attendances', [EventController::class, 'recordAttendances'])
+            ->where('event', '[0-9]{1,18}')
+            ->can('manageAttendances', Event::class);
     });
 
     // ── Paiements ───────────────────────────────────────────────────────
