@@ -1,0 +1,44 @@
+meta {
+  name: attendances-put
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/events/{{eventId}}/attendances
+  body: json
+  auth: inherit
+}
+
+headers {
+  Accept: application/json
+}
+
+vars:pre-request {
+  eventId: 1
+}
+
+body:json {
+  {
+    "present_member_ids": [{{memberId}}]
+  }
+}
+
+tests {
+  test("présences enregistrées", function () {
+    expect(res.status).to.equal(200);
+    const member = res.body.data.members.find((m) => m.id === bru.getVar("memberId"));
+    expect(member.present).to.equal(true);
+    expect(res.body.data.present_count).to.equal(1);
+  });
+}
+
+docs {
+  Enregistre les présences d'un événement (KAN-12, US-11) : le body est la liste complète des identifiants présents
+  (`present_member_ids`). Lancer d'abord `login-secretary` (token `secretaryToken`), `auth/register` (`memberId`) puis
+  `members/validate` : seuls les membres actifs peuvent être marqués présents (422 sinon, rien n'est enregistré).
+
+  Les présences de l'événement sont synchronisées dans une transaction : les membres absents de la liste sont décochés,
+  les autres ajoutés. L'appel est idempotent, et `[]` décoche tout le monde. Un identifiant en double donne un 422.
+  La réponse a le même format que `attendances-get`. 403 pour un compte `membre`, 404 pour un événement inconnu.
+}
