@@ -241,10 +241,12 @@ public function toDTO(): CheckInDTO
 - `GET /{song}` exige le même droit que la liste (`->can('viewAny', Song::class)` sur la route, `SongPolicy::view`
   aligné) : un compte sans rôle reçoit un 403, avant tout 404 (relevé par la deuxième revue de KAN-18 ; avant, il
   pouvait lire chaque cantique par son identifiant). `ShowSongTest` le couvre.
-- `POST` et `PUT` passent par la Policy dans les FormRequests de KAN-38 (PR de Kevin, non fusionnée au 28 novembre
-  2026 : sur `develop`, leur `authorize()` renvoie encore `true`, tout compte validé peut donc créer ou modifier un
-  cantique tant qu'elle n'est pas fusionnée). `SongPolicy::create` et `update` réservent ces actions à l'admin
-  (`RoleName::Admin`) ; ils citaient un rôle « responsable » qui n'existe pas, la règle effective est inchangée.
+- `POST` et `PUT` sont **réservés à l'admin** sur la route (`->can('create', Song::class)`, `->can('update', Song::class)` :
+  403 avant tout 404), en attendant les FormRequests de KAN-38 (PR de Kevin, non fusionnée au 28 novembre 2026) ; avant,
+  tout compte validé, même sans rôle, pouvait créer ou modifier un cantique. `SongPolicy::create` et `update` utilisent
+  `RoleName::Admin` (ils citaient un rôle « responsable » inexistant) ; `update` accepte le cantique en option : la route
+  l'appelle avec la classe, la FormRequest de KAN-38 avec le cantique. `SaveSongAuthorizationTest` (9 tests) le couvre.
+  KAN-38 modifie les mêmes lignes de `routes/api.php` (`whereNumber`) : conflit simple à résoudre en gardant les deux.
   `AttachSongToMassRequest` et `SongController::attach` n'ont aucune route (code mort).
 - Thèmes liturgiques (filtre `?theme=`, couleur) : reportés à KAN-23, dont le modèle n'est pas tranché (un ou plusieurs
   thèmes par cantique, liste fixe ou administrable, couleurs).

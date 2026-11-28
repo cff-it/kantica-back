@@ -79,11 +79,15 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
         // Répertoire (KAN-18, US-04) : `?search=` (titre ou auteur) et `?page=`
         Route::get('/', [SongController::class, 'index'])
             ->can('viewAny', Song::class);
-        Route::post('/', [SongController::class, 'store']);
+        // Ajout et modification réservés à l'admin, contrôlés sur la route (avec la classe : 403 avant tout 404) en
+        // attendant les FormRequests de KAN-38 ; avant, tout compte validé pouvait créer ou modifier un cantique
+        Route::post('/', [SongController::class, 'store'])
+            ->can('create', Song::class);
         // Un cantique se lit avec le même droit que la liste : un compte sans rôle reçoit un 403, avant tout 404
         Route::get('/{song}', [SongController::class, 'show'])
             ->can('viewAny', Song::class);
-        Route::put('/{song}', [SongController::class, 'update']);
+        Route::put('/{song}', [SongController::class, 'update'])
+            ->can('update', Song::class);
         Route::delete('/{song}', [SongController::class, 'destroy']);
     });
 

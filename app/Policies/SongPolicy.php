@@ -27,7 +27,9 @@ class SongPolicy
         return $user->hasRole(RoleName::Admin->value);
     }
 
-    public function update(User $user, Song $song): bool
+    // Appelée avec la classe par la route (sans cantique, avant tout 404) et avec le cantique par la FormRequest de
+    // KAN-38 : le cantique est donc facultatif
+    public function update(User $user, ?Song $song = null): bool
     {
         return $user->hasRole(RoleName::Admin->value);
     }
