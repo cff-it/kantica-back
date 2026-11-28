@@ -3,9 +3,11 @@
 namespace App\Policies;
 
 use App\Enums\RoleName;
-use App\Models\Song;
 use App\Models\User;
 
+// Aucun droit du répertoire ne dépend du cantique : les routes appellent la Policy avec la classe (403 avant tout 404).
+// Un appel avec le cantique, comme `can('update', $song)` dans les FormRequests de KAN-38, reste accepté : PHP ignore
+// l'argument en plus
 class SongPolicy
 {
     // Répertoire (US-04) : tous les rôles, de Membre à Admin. Le compte doit aussi être validé (middleware de la route)
@@ -14,28 +16,26 @@ class SongPolicy
         return $user->hasRole([RoleName::Admin->value, RoleName::Secretary->value, RoleName::Member->value,]);
     }
 
-    // Même règle que la liste : la route `GET /songs/{song}` l'applique avec `viewAny`, sans charger le cantique
-    public function view(User $user, Song $song): bool
+    // Un cantique se lit avec le même droit que la liste. La route `GET /songs/{song}` applique `viewAny` ; `view` reste
+    // l'entrée standard d'un `can('view', $song)` (fiche, KAN-25) et ne peut pas s'en écarter
+    public function view(User $user): bool
     {
         return $this->viewAny($user);
     }
 
-    // Ajout et modification réservés à l'admin (bouton « + Ajouter », KAN-13). Le rôle « responsable », cité ici
-    // auparavant, n'existe pas (RoleName) : la règle effective reste la même
+    // Ajout, modification et suppression réservés à l'admin (KAN-13). Le rôle « responsable », cité ici auparavant,
+    // n'existe pas (RoleName) : la règle effective reste la même
     public function create(User $user): bool
     {
         return $user->hasRole(RoleName::Admin->value);
     }
 
-    // Appelée avec la classe par la route (sans cantique, avant tout 404) et avec le cantique par la FormRequest de
-    // KAN-38 : le cantique est donc facultatif
-    public function update(User $user, ?Song $song = null): bool
+    public function update(User $user): bool
     {
         return $user->hasRole(RoleName::Admin->value);
     }
 
-    // Appelée avec la classe par la route, avant tout 404
-    public function delete(User $user, ?Song $song = null): bool
+    public function delete(User $user): bool
     {
         return $user->hasRole(RoleName::Admin->value);
     }

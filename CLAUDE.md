@@ -238,9 +238,11 @@ public function toDTO(): CheckInDTO
   (`viewAny`, `SongPolicy::view` aligné). `POST /`, `PUT /{song}` et `DELETE /{song}` : **admin seulement**
   (`create`, `update`, `delete` avec `RoleName::Admin` ; KAN-13 : « Un utilisateur non admin ne peut pas créer de
   cantique », modification « uniquement pour l'Admin »). Avant, un compte sans rôle pouvait lire chaque cantique, et tout
-  compte validé pouvait en créer, modifier ou supprimer. `update` et `delete` acceptent le cantique en option : appel par
-  la classe sur la route, et avec le cantique dans les FormRequests de KAN-38 (PR de Kevin, non fusionnée au 28 novembre
-  2026), qui contrôleront donc une seconde fois : à unifier à leur fusion. KAN-38 modifie les mêmes lignes de
+  compte validé pouvait en créer, modifier ou supprimer. Aucune méthode de `SongPolicy` ne prend le cantique, puisque
+  le droit n'en dépend pas ; un appel avec le cantique (`can('update', $song)` dans les FormRequests de KAN-38, PR de
+  Kevin non fusionnée au 28 novembre 2026) reste accepté, PHP ignorant l'argument en plus. Ces FormRequests contrôleront
+  une seconde fois : à unifier à leur fusion. `authorize()` de `CreateSongRequest` et `UpdateSongRequest` reste à `true`
+  ici, KAN-38 les réécrit ; les tests HTTP échouent si le contrôle de la route disparaît. KAN-38 modifie les mêmes lignes de
   `routes/api.php` (`whereNumber`) : conflit simple, garder `whereNumber` et `can`.
 - Suppression : `DeleteSongAction` reçoit l'identifiant, lit le cantique une seule fois (404 s'il n'existe pas, pour
   l'admin) et le supprime. Le rôle « responsable » que citait `SongPolicy` n'existe pas : règle effective inchangée.
