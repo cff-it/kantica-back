@@ -23,7 +23,8 @@ readonly class SyncSongSectionsAction
     /**
      * @param  list<SongSectionDTO>  $sections
      *
-     * @throws ValidationException si une section à supprimer est utilisée dans l'ordre d'une messe
+     * @throws ValidationException si une section à supprimer est utilisée dans l'ordre d'une messe, ou si une section de
+     *                             la liste n'existe plus (supprimée par une modification simultanée)
      */
     public function __invoke(Song $song, array $sections): void
     {
@@ -49,10 +50,22 @@ readonly class SyncSongSectionsAction
 
             if ($section->id === null) {
                 $this->sections->create($song, $attributes);
-            } else {
-                // Identifiant inconnu de ce cantique : ModelNotFoundException (déjà refusé en amont par la requête)
-                $this->sections->update($existing->findOrFail($section->id), $attributes);
+
+                continue;
             }
+
+            // La requête a déjà vérifié que la section appartient au cantique, mais une modification simultanée a pu la
+            // supprimer entre la validation et le verrou du cantique : 422 sur cette section, pas un 404 « cantique
+            // introuvable » alors que le cantique existe
+            $current = $existing->get($section->id);
+
+            if ($current === null) {
+                throw ValidationException::withMessages([
+                    "sections.{$position}.id" => 'Cette section n\'existe plus : rechargez le cantique.',
+                ]);
+            }
+
+            $this->sections->update($current, $attributes);
         }
     }
 }

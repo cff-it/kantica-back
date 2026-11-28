@@ -272,6 +272,25 @@ public function toDTO(): CheckInDTO
   accents, compteur, 422, 401) et avec l'admin (suppressions 204, cantique inconnu 404, lecture d'un cantique 200).
   **Non vérifié** : la préprod Railway, où le jeu de démonstration n'a pas été chargé.
 
+### Sections d'un cantique (KAN-38)
+
+- Les sections (`SectionType` : `couplet`, `refrain`, `pont`) se saisissent avec le cantique : `sections: [{id?, type, number?, text}]`
+  sur `POST /api/songs` et `PUT /api/songs/{song}`. `SyncSongSectionsAction` aligne les sections sur la liste (crée sans `id`,
+  met à jour avec `id`, supprime les absentes), dans la transaction de `CreateSongAction` et `UpdateSongAction`. La position est
+  le rang dans la liste ; le numéro (Couplet 1, 2, 3) est saisi, facultatif, jamais calculé. À la modification, `sections` absent
+  ou `null` laisse les sections inchangées, `[]` les supprime toutes.
+- Une section utilisée dans l'ordre d'une messe (`mass_song_sections`) ne peut pas être supprimée (422, rien n'est enregistré) :
+  la cascade SQL la retirerait en silence de messes déjà préparées ou chantées. Choix à confirmer avec la présidente avant US-18.
+  Les sections sont verrouillées avant ce contrôle et le cantique l'est à la modification (`findByIdForUpdate`), pour que deux
+  modifications simultanées passent l'une après l'autre.
+- Bornes : 100 sections par cantique, 5000 caractères par texte de section, 2000 pour `notes`.
+- `GET /api/songs/{song}` ajoute `usage` : `ShowSongAction`, `SongUsageRepository` (jointures et tri en SQL, messes jusqu'à la
+  date du jour comprise) et `SongDetailResource`. `times_sung` compte toutes les utilisations, `history` garde les 50 plus
+  récentes. La liste, l'ajout et la modification ne renvoient pas `usage`.
+- `Song` et `SongSection` ciblent la colonne `uuid` (`uniqueIds()`) : `HasUuids` visait sinon la clé `id`, entière. Huit autres
+  modèles ont le même défaut (`Libretto`, `Prayer`, `UserPayment`, `SongLibretto`, `LinkType`, `MassPart`, `SongLink`,
+  `SongTheme`), non corrigé ici.
+
 ## Conventions de nommage
 
 - **Actions** : verbe + nom + suffixe `Action` → `CreateSongAction`, `CheckInMemberAction`, `GeneratePptxAction`

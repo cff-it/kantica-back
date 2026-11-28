@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Song;
 
+use App\Actions\Song\SyncSongSectionsAction;
+use App\DTOs\Song\SongSectionDTO;
 use App\Enums\RoleName;
 use App\Enums\SectionType;
 use App\Models\Song;
@@ -10,6 +12,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -399,6 +402,26 @@ class SongSectionsTest extends TestCase
             ->assertJsonValidationErrors(['sections.0.id', 'sections.1.id',]);
 
         $this->assertSame([['couplet', 'Un', 0,],], $this->storedSections($song));
+    }
+
+    // Modification simultanée : la section a disparu entre la validation de la requête et le verrou du cantique. Le cas
+    // ne se produit pas par HTTP en un seul processus, d'où l'appel direct de l'action.
+    public function test_a_section_deleted_in_the_meantime_gives_a_validation_error_not_a_not_found(): void
+    {
+        $song = $this->song([[SectionType::Verse, 'Un',],]);
+        $deletedId = $song->sections()->value('id');
+        $song->sections()->delete();
+
+        try {
+            app(SyncSongSectionsAction::class)($song, [new SongSectionDTO($deletedId, SectionType::Verse, null, 'Un', ),]);
+
+            $this->fail('Une ValidationException était attendue.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                ['sections.0.id' => ['Cette section n\'existe plus : rechargez le cantique.',],],
+                $exception->errors(),
+            );
+        }
     }
 
     // ── Validations ─────────────────────────────────────────────────────────
