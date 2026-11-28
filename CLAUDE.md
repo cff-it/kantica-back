@@ -244,7 +244,7 @@ public function toDTO(): CheckInDTO
   appels donnent la même réponse. Ces FormRequests contrôleront
   une seconde fois : à unifier à leur fusion. `authorize()` de `CreateSongRequest` et `UpdateSongRequest` reste à `true`
   ici, KAN-38 les réécrit ; les tests HTTP échouent si le contrôle de la route disparaît. Les routes `/{song}` limitent
-  l'identifiant à 18 chiffres (`where('song', '[0-9]{1,18}')`, sous `PHP_INT_MAX`) : un identifiant non numérique ou
+  l'identifiant à 18 chiffres (`where` sur le groupe `songs`, `[0-9]{1,18}`, sous `PHP_INT_MAX`) : un identifiant non numérique ou
   trop grand donne un 404 au lieu d'une erreur 500 sur le paramètre `int` du contrôleur (`whereNumber` laissait passer
   `99999999999999999999`). KAN-38 pose `whereNumber` sur ces lignes : en cas de conflit, garder cette contrainte et `can`.
 - Suppression : `DeleteSongAction` reçoit l'identifiant, lit le cantique une seule fois (404 s'il n'existe pas, pour
