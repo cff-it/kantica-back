@@ -3,10 +3,13 @@
 namespace App\Http\Requests\User;
 
 use App\DTOs\User\ListUsersDTO;
+use App\Http\Requests\Concerns\ValidatesPage;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ListUsersRequest extends FormRequest
 {
+    use ValidatesPage;
+
     // L'accès (Admin) est contrôlé par la Policy sur la route
     public function authorize(): bool
     {
@@ -17,24 +20,20 @@ class ListUsersRequest extends FormRequest
     {
         return [
             'search' => ['nullable', 'string', 'max:100',],
-            // Borne haute : au-delà de PHP_INT_MAX / 20, le décalage de la page n'est plus un entier (erreur 500)
-            'page'   => ['nullable', 'integer', 'min:1', 'max:100000',],
+            'page'   => $this->pageRules(),
         ];
     }
 
     public function messages(): array
     {
-        return [
-            'page.min' => 'La page doit être supérieure ou égale à 1.',
-            'page.max' => 'La page demandée est trop grande.',
-        ];
+        return $this->pageMessages();
     }
 
     public function toDTO(): ListUsersDTO
     {
         return new ListUsersDTO(
             search: $this->input('search'),
-            page: max(1, $this->integer('page', 1)),
+            page: $this->requestedPage(),
         );
     }
 }

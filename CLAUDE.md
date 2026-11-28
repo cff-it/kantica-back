@@ -194,8 +194,11 @@ public function toDTO(): CheckInDTO
   chaque compte et `meta.role_counts`) et `AssignRoleAction` (`PUT /api/users/{user}/role`, `{ role }`).
 - `page` est bornée à 100 000 dans `ListUsersRequest` et `ListMembersRequest` (422 « La page demandée est trop
   grande. »), comme `ListSongsRequest` (répertoire, KAN-18) : sans borne, `PHP_INT_MAX` passait la validation et le
-  décalage de la page (`forPage`, `array_slice`) n'était plus un entier, d'où une erreur 500. La borne et son message
-  sont écrits dans chaque FormRequest : une règle commune aux quatre listes reste à poser.
+  décalage de la page (`forPage`, `array_slice`) n'était plus un entier, d'où une erreur 500. Règles, messages et
+  lecture de `page` sont communs aux quatre listes paginées (membres, rôles, historique des imports, répertoire) : trait
+  `ValidatesPage` (`app/Http/Requests/Concerns/`), avec les mêmes messages partout (« La page doit être un nombre
+  entier. », « … supérieure ou égale à 1. », « La page demandée est trop grande. »). `ListPageTest` vérifie les quatre
+  routes ensemble ; une nouvelle liste paginée reprend ce trait.
   **Vérifié** : `ManageRolesTest` et `ListMembersTest` (page 100 000 vide, 100 001 et `PHP_INT_MAX` refusées ; ces
   tests finissaient en 500 avant la borne), sous SQLite et PostgreSQL, et contre le back de dev (les deux routes).
 - Même borne pour l'historique des imports (`ListUsersImportsRequest`, `GET /api/users/import?page=`, paginé en SQL).
