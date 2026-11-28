@@ -75,14 +75,25 @@ Route::middleware(['auth:sanctum', 'account.active',])->group(function () {
         ->can('export', User::class);
 
     // ── Répertoire chants ───────────────────────────────────────────────
-    Route::prefix('songs')->group(function () {
+    // `{song}` : 18 chiffres au plus, sous PHP_INT_MAX, pour toutes les routes du groupe. Un identifiant non numérique ou
+    // trop grand donne un 404, au lieu d'une erreur 500 sur le paramètre `int $song` du contrôleur (`whereNumber`
+    // laissait passer les nombres trop grands)
+    Route::prefix('songs')->where(['song' => '[0-9]{1,18}',])->group(function () {
         // Répertoire (KAN-18, US-04) : `?search=` (titre ou auteur) et `?page=`
         Route::get('/', [SongController::class, 'index'])
             ->can('viewAny', Song::class);
-        Route::post('/', [SongController::class, 'store']);
-        Route::get('/{song}', [SongController::class, 'show']);
-        Route::put('/{song}', [SongController::class, 'update']);
-        Route::delete('/{song}', [SongController::class, 'destroy']);
+        // Chaque route contrôle le rôle elle-même, avec la classe (403 avant tout 404) : lecture pour les trois rôles,
+        // ajout, modification et suppression pour l'admin (KAN-13). Avant, tout compte validé pouvait écrire ; les
+        // FormRequests de KAN-38 contrôleront aussi le cantique, à unifier à leur fusion
+        Route::post('/', [SongController::class, 'store'])
+            ->can('create', Song::class);
+        // Un cantique se lit avec le même droit que la liste : un compte sans rôle reçoit un 403, avant tout 404
+        Route::get('/{song}', [SongController::class, 'show'])
+            ->can('viewAny', Song::class);
+        Route::put('/{song}', [SongController::class, 'update'])
+            ->can('update', Song::class);
+        Route::delete('/{song}', [SongController::class, 'destroy'])
+            ->can('delete', Song::class);
     });
 
     // ── Liturgie messes ─────────────────────────────────────────────────

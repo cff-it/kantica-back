@@ -49,10 +49,10 @@ class SongController extends Controller
         return SongResource::make($action($request->toDTO()));
     }
 
-    // Réservée à l'admin : DeleteSongRequest applique SongPolicy::delete au cantique, chargé une seule fois
-    public function destroy(DeleteSongRequest $request, DeleteSongAction $action): JsonResponse
+    // Réservée à l'admin : la route applique SongPolicy::delete avant tout 404, DeleteSongRequest le vérifie aussi
+    public function destroy(DeleteSongRequest $request, int $song, DeleteSongAction $action): JsonResponse
     {
-        $action($request->song());
+        $action($song);
 
         return response()->json(null, 204);
     }
